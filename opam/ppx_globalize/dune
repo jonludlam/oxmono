@@ -1,0 +1,8 @@
+(library
+ (name ppx_globalize)
+ (public_name ppx_globalize)
+ (kind ppx_deriver)
+ (ppx_runtime_libraries)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (libraries compiler-libs.common ppx_helpers ppxlib ppxlib_jane ppxlib.stdppx))
