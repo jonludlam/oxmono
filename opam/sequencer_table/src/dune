@@ -1,0 +1,6 @@
+(library
+ (name sequencer_table)
+ (public_name sequencer_table)
+ (preprocess
+  (pps ppx_jane))
+ (libraries async_kernel core))
