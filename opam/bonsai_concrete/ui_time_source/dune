@@ -1,0 +1,7 @@
+(library
+ (name ui_time_source)
+ (public_name bonsai_concrete.ui_time_source)
+ (libraries core core_kernel.reversed_list core_kernel.timing_wheel
+   virtual_dom.ui_effect ui_incr ui_metrics)
+ (preprocess
+  (pps ppx_jane)))

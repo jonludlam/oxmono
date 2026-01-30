@@ -1,0 +1,6 @@
+(library
+ (name ui_incr)
+ (public_name bonsai_concrete.ui_incr)
+ (libraries core incr_map incr_select incremental)
+ (preprocess
+  (pps ppx_jane)))

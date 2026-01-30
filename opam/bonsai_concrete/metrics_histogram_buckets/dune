@@ -1,0 +1,6 @@
+(library
+ (name prometheus_instrumentation_collector_histogram_buckets)
+ (public_name bonsai_concrete.metrics_histogram_buckets)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane -require-template-extension)))
