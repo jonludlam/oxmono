@@ -1,0 +1,21 @@
+(library
+  (name inotify)
+  (public_name inotify)
+  (foreign_stubs (language c) (names inotify_stubs))
+  (libraries unix)
+  (modules inotify))
+
+(library
+  (name lwt_inotify)
+  (public_name inotify.lwt)
+  (optional)
+  (flags (:standard -w -32-39))
+  (libraries inotify lwt lwt.unix)
+  (modules lwt_inotify))
+
+(library
+  (name eio_inotify)
+  (public_name inotify-eio)
+  (flags (:standard -w -32-39))
+  (libraries inotify eio.unix iomux)
+  (modules eio_inotify))
