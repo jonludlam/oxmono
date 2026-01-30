@@ -1,0 +1,5 @@
+(library
+ (name janestreet_shims_internal)
+ (public_name janestreet_shims.internal)
+ (libraries)
+ (preprocess no_preprocessing))
