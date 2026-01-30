@@ -1,0 +1,6 @@
+(library
+ (name expectree_test)
+ (public_name expectree.expectree_test)
+ (libraries core expectree)
+ (preprocess
+  (pps ppx_jane)))

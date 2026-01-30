@@ -1,0 +1,5 @@
+(library
+ (name expectree)
+ (public_name expectree)
+ (libraries base)
+ (preprocess no_preprocessing))
