@@ -1,0 +1,5 @@
+(library
+ (name insertion_ordered_map_test)
+ (libraries core insertion_ordered_map)
+ (preprocess
+  (pps ppx_jane)))

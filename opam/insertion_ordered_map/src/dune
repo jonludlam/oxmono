@@ -1,0 +1,6 @@
+(library
+ (name insertion_ordered_map)
+ (public_name insertion_ordered_map)
+ (libraries core sexplib)
+ (preprocess
+  (pps ppx_jane)))
