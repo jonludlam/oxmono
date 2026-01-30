@@ -1,0 +1,25 @@
+(executable
+ (name jsontrip)
+ (public_name jsontrip)
+ (package jsonm)
+ (modules jsontrip)
+ (libraries jsonm unix))
+
+(executable
+ (name test)
+ (modules test)
+ (libraries jsonm))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))
+
+(executable
+ (name examples)
+ (modules examples)
+ (libraries jsonm unix))
+
+(executable
+ (name jtree)
+ (modules jtree)
+ (libraries jsonm))

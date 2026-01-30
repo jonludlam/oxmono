@@ -1,0 +1,6 @@
+(library
+ (name logs_threaded)
+ (public_name logs.threaded)
+ (libraries logs threads)
+ (optional)
+ (wrapped false))

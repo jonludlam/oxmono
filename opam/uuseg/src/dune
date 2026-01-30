@@ -1,0 +1,5 @@
+(library
+ (name uuseg)
+ (public_name uuseg)
+ (wrapped false)
+ (libraries uucp))

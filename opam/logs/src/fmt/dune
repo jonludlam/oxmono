@@ -1,0 +1,11 @@
+(library
+ (name logs_fmt)
+ (public_name logs.fmt)
+ (libraries fmt logs)
+ (modules logs_fmt)
+ (wrapped false))
+
+(install
+ (package logs)
+ (section lib)
+ (files logs_fmt_top_init.ml))

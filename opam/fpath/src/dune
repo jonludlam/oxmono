@@ -1,0 +1,11 @@
+(library
+ (name fpath)
+ (public_name fpath)
+ (modules fpath)
+ (libraries astring)
+ (wrapped false))
+
+(install
+ (package fpath)
+ (section lib)
+ (files fpath_top_init.ml))

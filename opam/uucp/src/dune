@@ -1,0 +1,4 @@
+(library
+ (name uucp)
+ (public_name uucp)
+ (wrapped false))

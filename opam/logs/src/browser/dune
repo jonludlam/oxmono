@@ -1,0 +1,6 @@
+(library
+ (name logs_browser)
+ (public_name logs.browser)
+ (libraries logs js_of_ocaml-compiler.runtime)
+ (optional)
+ (wrapped false))

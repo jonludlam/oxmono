@@ -1,0 +1,8 @@
+(executable
+ (name test_fpath)
+ (modules test_fpath)
+ (libraries fpath b0.testing))
+
+(rule
+ (alias runtest)
+ (action (run ./test_fpath.exe)))

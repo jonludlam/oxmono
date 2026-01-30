@@ -1,0 +1,26 @@
+(library
+ (name bos)
+ (public_name bos)
+ (modules bos_base bos_pat bos_log bos_cmd bos_os_u bos_os_tmp bos_os_path
+          bos_os_file bos_os_dir bos_os_cmd bos_os_env bos_os_arg bos)
+ (libraries astring fpath fmt logs rresult unix)
+ (wrapped false))
+
+(library
+ (name bos_setup)
+ (public_name bos.setup)
+ (modules bos_setup)
+ (libraries bos rresult fmt.tty logs.fmt)
+ (wrapped false))
+
+(library
+ (name bos_top)
+ (public_name bos.top)
+ (libraries compiler-libs.toplevel bos astring.top fpath.top fmt.top logs.top)
+ (modules bos_top)
+ (wrapped false))
+
+(install
+ (package bos)
+ (section lib)
+ (files bos_top_init.ml))

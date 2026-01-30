@@ -1,0 +1,17 @@
+(executable
+ (name ucharinfo)
+ (public_name ucharinfo)
+ (package uucp)
+ (optional)
+ (modules ucharinfo)
+ (libraries uucp uunf cmdliner))
+
+(executable
+ (name link_test)
+ (modules link_test)
+ (libraries uucp))
+
+(executable
+ (name perf)
+ (modules perf)
+ (libraries uucp))

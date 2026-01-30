@@ -1,0 +1,6 @@
+(library
+ (name logs_lwt)
+ (public_name logs.lwt)
+ (libraries lwt logs)
+ (optional)
+ (wrapped false))

@@ -1,0 +1,5 @@
+(library
+ (name logs_cli)
+ (public_name logs.cli)
+ (libraries logs cmdliner)
+ (wrapped false))

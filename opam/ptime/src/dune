@@ -1,0 +1,10 @@
+(library
+ (name ptime)
+ (public_name ptime)
+ (modules ptime)
+ (wrapped false))
+
+(install
+ (package ptime)
+ (section lib)
+ (files ptime_top_init.ml))

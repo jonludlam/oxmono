@@ -1,0 +1,17 @@
+(library
+ (name react)
+ (public_name react)
+ (modules react)
+ (wrapped false))
+
+(library
+ (name react_top)
+ (public_name react.top)
+ (libraries compiler-libs.toplevel react)
+ (modules react_top)
+ (wrapped false))
+
+(install
+ (package react)
+ (section lib)
+ (files react_top_init.ml))

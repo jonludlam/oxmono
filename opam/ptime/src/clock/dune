@@ -1,0 +1,15 @@
+(library
+ (name ptime_clock)
+ (public_name ptime.clock)
+ (libraries ptime)
+ (modules ptime_clock)
+ (foreign_stubs
+  (language c)
+  (names ptime_clock_stubs))
+ (js_of_ocaml
+  (javascript_files runtime.js))
+ (wrapped false))
+
+(deprecated_library_name
+ (old_public_name ptime.clock.os)
+ (new_public_name ptime.clock))

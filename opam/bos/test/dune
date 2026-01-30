@@ -1,0 +1,24 @@
+(executable
+ (name test)
+ (modules test testing test_pat test_cmd test_os_cmd)
+ (libraries bos rresult logs.fmt))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))
+
+(executable
+ (name test_arg)
+ (modules test_arg)
+ (libraries bos logs logs.fmt))
+
+(executable
+ (name test_arg_pos)
+ (modules test_arg_pos)
+ (libraries bos logs logs.fmt fmt.tty))
+
+(executable
+ (name watch)
+ (modules watch)
+ (optional)
+ (libraries bos.setup fmt.tty mtime mtime.clock.os))

@@ -1,0 +1,18 @@
+(executable
+ (name test)
+ (modules test)
+ (libraries react))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))
+
+(executable
+ (name clock)
+ (modules clock)
+ (libraries react unix))
+
+(executable
+ (name breakout)
+ (modules breakout)
+ (libraries react unix))

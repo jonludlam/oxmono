@@ -1,0 +1,12 @@
+(install
+ (package brr)
+ (section share)
+ (files
+  (devtools.html as console/devtools.html)
+  (devtools.js as console/devtools.js)
+  (highlight.pack.js as console/highlight.pack.js)
+  (manifest.json as console/manifest.json)
+  (ocaml.png as console/ocaml.png)
+  (ocaml_console.css as console/ocaml_console.css)
+  (ocaml_console.html as console/ocaml_console.html)
+  (ocaml_console.js as console/ocaml_console.js)))

@@ -1,0 +1,8 @@
+(documentation
+ (package brr))
+
+(install
+ (package brr)
+ (section doc)
+ (files
+  (ocaml_console.png as odoc-assets/ocaml_console.png)))

@@ -1,0 +1,7 @@
+(library
+ (name brr)
+ (public_name brr)
+ (libraries js_of_ocaml-compiler.runtime)
+ (modules jv jstr fut brr brr_io brr_canvas brr_webgpu brr_webaudio
+          brr_webcrypto brr_webmidi brr_webworkers)
+ (wrapped false))

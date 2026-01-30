@@ -1,0 +1,6 @@
+(executable
+ (name cmarkit_main)
+ (public_name cmarkit)
+ (package cmarkit)
+ (optional)
+ (libraries cmarkit cmdliner))

@@ -1,0 +1,29 @@
+(executable
+ (name xmltrip)
+ (public_name xmltrip)
+ (package xmlm)
+ (modules xmltrip xhtml)
+ (libraries xmlm))
+
+(executable
+ (name test)
+ (modules test)
+ (libraries xmlm))
+
+(executable
+ (name examples)
+ (modules examples)
+ (libraries xmlm))
+
+(executable
+ (name test_tree)
+ (modules test_tree)
+ (libraries xmlm))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))
+
+(rule
+ (alias runtest)
+ (action (run ./test_tree.exe)))

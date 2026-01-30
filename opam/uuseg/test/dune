@@ -1,0 +1,21 @@
+(executable
+ (name usegtrip)
+ (modules usegtrip)
+ (optional)
+ (libraries uuseg cmdliner uutf))
+
+(executable
+ (name test_uuseg)
+ (modules test_uuseg)
+ (optional)
+ (libraries uuseg uucp b0.testing b0.std cmdliner))
+
+; Tests disabled - require b0 library which is not available
+; (rule
+;  (alias runtest)
+;  (deps test_uuseg.exe
+;        GraphemeBreakTest.txt
+;        WordBreakTest.txt
+;        SentenceBreakTest.txt
+;        LineBreakTest.txt)
+;  (action (run ./test_uuseg.exe)))

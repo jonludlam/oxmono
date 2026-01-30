@@ -1,0 +1,4 @@
+(library
+ (name cmarkit)
+ (public_name cmarkit)
+ (wrapped false))

@@ -1,0 +1,5 @@
+(library
+ (name brr_poke)
+ (public_name brr.poke)
+ (libraries js_of_ocaml-compiler.runtime js_of_ocaml-toplevel brr)
+ (wrapped false))
