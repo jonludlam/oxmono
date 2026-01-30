@@ -1,0 +1,7 @@
+(library
+ (name core_bench_internals)
+ (public_name core_bench.internals)
+ (libraries core_kernel.ansi_kernel textutils.ascii_table_kernel core
+   core_extended.delimited_kernel)
+ (preprocess
+  (pps ppx_jane)))
