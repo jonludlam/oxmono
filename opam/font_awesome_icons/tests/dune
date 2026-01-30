@@ -1,0 +1,12 @@
+(library
+ (name font_awesome_icons_test)
+ (libraries bonsai bonsai.proc bonsai_web bonsai_web_test core)
+ (preprocess
+  (pps ppx_tailwind ppx_expect)))
+
+(rule
+ (targets font_awesome_icons.ml font_awesome_icons.mli)
+ (deps)
+ (action
+  (bash
+    "%{bin:embed-font-awesome-icons} -output font_awesome_icons solid-arrow-right-arrow-left brands-bitcoin")))

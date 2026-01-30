@@ -1,0 +1,22 @@
+* embed_font_awesome_icons.exe
+
+: Embed FontAwesome SVG icons
+:
+:   embed_font_awesome_icons.exe [SVG [SVG ...]]
+:
+: === flags ===
+:
+:   -output NAME               . name of the generated module
+:   [-im-super-duper-sure-i-want-to-embed-hundreds-of-icons]
+:                              . Embed all available FontAwesome icons. WARNING:
+:                                You probably really don't want to do this.
+:   [-only-aarray-in-mli]      . BOOL only expose [ by_arg_name ] in the mli and
+:                                no individual svgs (must be passed with
+:                                [-with-aarray])
+:   [-output-dir PATH]         . where to put the generated module (default = cwd)
+:   [-with-aarray]             . BOOL create a variable [ by_arg_name ] that
+:                                contains an assoc array of the icon command line
+:                                argument names to svg content
+:   [-build-info]              . print info about this build and exit
+:   [-version]                 . print the version of this build and exit
+:   [-help], -?                . print this help text and exit

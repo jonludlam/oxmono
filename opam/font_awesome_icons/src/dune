@@ -1,0 +1,6 @@
+(library
+ (name font_awesome_icons)
+ (public_name font_awesome_icons)
+ (libraries async async_unix core core_unix core_unix.filename_unix)
+ (preprocess
+  (pps ppx_jane)))

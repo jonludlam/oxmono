@@ -1,0 +1,7 @@
+(executables
+ (modes byte exe)
+ (names embed_font_awesome_icons)
+ (public_names embed-font-awesome-icons)
+ (libraries core_unix.command_unix core font_awesome_icons)
+ (preprocess
+  (pps ppx_jane)))
