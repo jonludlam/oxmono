@@ -1,0 +1,408 @@
+open! Base
+
+module Uid : sig @@ portable
+  type t : value mod contended portable
+
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val next : string -> t
+  val hash : t -> int
+  val name : t -> string
+  val static : t
+  val sexp_of_t : t -> Sexp.t
+end = struct
+  type t =
+    { code : int
+    ; name : string
+    }
+
+  let compare a b = compare (a.code : int) b.code
+  let equal a b = (a.code : int) = b.code
+  let uid = Stdlib.Atomic.make 0
+
+  let next name =
+    let code = Stdlib.Atomic.fetch_and_add uid 1 in
+    { code; name }
+  ;;
+
+  let hash a = Hashtbl.hash a.code
+  let name a = a.name
+  let static = next "static"
+  let sexp_of_t t = Sexp.Atom t.name
+end
+
+module Key = struct
+  type t : value mod contended portable =
+    { uid : Uid.t
+    ; params : t list
+    }
+
+  let rec compare k1 k2 =
+    if phys_equal k1 k2
+    then 0
+    else (
+      let cmp = Uid.compare k1.uid k2.uid in
+      if cmp <> 0 then cmp else List.compare compare k1.params k2.params)
+  ;;
+
+  let equal a b = compare a b = 0
+  let hash = (Hashtbl.hash : t -> int)
+  let static = { uid = Uid.static; params = [] }
+
+  let rec sexp_of_t { uid; params } =
+    match params with
+    | [] -> Uid.sexp_of_t uid
+    | _ :: _ -> Sexp.List (Uid.sexp_of_t uid :: List.map ~f:sexp_of_t params)
+  ;;
+end
+
+type ('a : any) t = Key.t
+type ('a : any) typename = 'a t
+
+let key t = t
+let uid t = t.Key.uid
+let name t = Uid.name t.Key.uid
+let static = Key.static
+let create ?(name = "Typename.create") () = { Key.uid = Uid.next name; params = [] }
+
+include struct
+  (* The argument for Stdlib.Obj.magic here is the same as the one in core/type_equal *)
+
+  let same (type (a : any) (b : any)) (nm1 : a t) (nm2 : b t) = Key.compare nm1 nm2 = 0
+
+  let same_witness (type (a : any) (b : any)) (nm1 : a t) (nm2 : b t) =
+    if Key.compare nm1 nm2 = 0
+    then Some (Stdlib.Obj.magic Type_equal.refl : (a, b) Type_equal.t)
+    else None
+  ;;
+
+  let same_witness_exn (type (a : any) (b : any)) (nm1 : a t) (nm2 : b t) =
+    if Key.compare nm1 nm2 = 0
+    then (Stdlib.Obj.magic Type_equal.refl : (a, b) Type_equal.t)
+    else failwith "Typename.same_witness_exn"
+  ;;
+end
+
+module Tuple_l = struct
+  module Labels = struct
+    type t = string option list
+
+    let compare x y = compare_list (compare_option compare_string) x y
+    let sexp_of_t t = sexp_of_list (sexp_of_option sexp_of_string) t
+
+    include (val (Comparator.make [@modality portable]) ~compare ~sexp_of_t)
+  end
+
+  module Internal_use_only = struct
+    module Uids : sig
+      type ('a, 'cmp) t : value mod contended portable
+
+      val create
+        : 'a ('cmp : value mod portable).
+        ((module Comparator.S with type t = 'a and type comparator_witness = 'cmp)
+        [@modality portable])
+        -> ('a, 'cmp) t
+
+      val find_or_add
+        : ('a : value mod contended portable) ('cmp : value mod portable).
+        ('a, 'cmp) t -> 'a -> name:('a -> string) @ portable -> Uid.t
+    end = struct
+      type ('a, 'cmp) t = ('a, Uid.t, 'cmp) Map.t Portable.Atomic.t
+
+      let create
+        (type a (cmp : value mod portable))
+        (m :
+          ((module Comparator.S with type t = a and type comparator_witness = cmp)
+          [@modality portable]))
+        =
+        Portable.Atomic.make ((Map.empty [@mode portable]) m)
+      ;;
+
+      let find_or_add
+        (type (a : value mod contended portable) (cmp : value mod portable))
+        (t : (a, cmp) t)
+        key
+        ~name
+        =
+        let name = Portable_lazy.from_fun (fun () -> name key) in
+        Portable.Atomic.update t ~pure_f:(fun t ->
+          Map.update t key ~f:(function
+            | None -> Uid.next (Portable_lazy.force name)
+            | Some uid -> uid));
+        Map.find_exn (Portable.Atomic.get t) key
+      ;;
+    end
+
+    let uids_of_t = Uids.create (module Labels)
+    let uids_of_element = Uids.create (module Int)
+
+    module Boxed = struct
+      module Element = struct
+        type t = T : string option * Key.t -> t
+      end
+
+      type t = Element.t list
+
+      let typename_of_index typename_of_t index =
+        { Key.uid =
+            Uids.find_or_add uids_of_element index ~name:(fun index ->
+              Printf.sprintf "element%d" index)
+        ; params = [ typename_of_t ]
+        }
+      ;;
+
+      let typename_of_t elements =
+        let labels, params =
+          List.map elements ~f:(fun (Element.T (label, key)) -> label, key) |> List.unzip
+        in
+        { Key.uid =
+            Uids.find_or_add uids_of_t labels ~name:(fun labels ->
+              Printf.sprintf "tuple%d" (List.length labels)
+              :: List.map labels ~f:(Option.value ~default:".")
+              |> String.concat ~sep:"_")
+        ; params
+        }
+      ;;
+    end
+
+    module Unboxed = struct
+      module Element = struct
+        type (_ : any) t = T : ('a : any). string option * 'a typename -> 'a t
+      end
+
+      type (_ : any) t =
+        | T2 :
+            ('tuple : any) ('a : any) ('b : any).
+            'a Element.t * 'b Element.t
+            -> 'tuple t
+        | T3 :
+            ('tuple : any) ('a : any) ('b : any) ('c : any).
+            'a Element.t * 'b Element.t * 'c Element.t
+            -> 'tuple t
+        | T4 :
+            ('tuple : any) ('a : any) ('b : any) ('c : any) ('d : any).
+            'a Element.t * 'b Element.t * 'c Element.t * 'd Element.t
+            -> 'tuple t
+        | T5 :
+            ('tuple : any) ('a : any) ('b : any) ('c : any) ('d : any) ('e : any).
+            'a Element.t * 'b Element.t * 'c Element.t * 'd Element.t * 'e Element.t
+            -> 'tuple t
+
+      let typename_of_t : type (a : any). a t -> a typename =
+        fun t ->
+        let labels, params =
+          match t with
+          | T2 (T (l1, t1), T (l2, t2)) -> [ l1; l2 ], [ key t1; key t2 ]
+          | T3 (T (l1, t1), T (l2, t2), T (l3, t3)) ->
+            [ l1; l2; l3 ], [ key t1; key t2; key t3 ]
+          | T4 (T (l1, t1), T (l2, t2), T (l3, t3), T (l4, t4)) ->
+            [ l1; l2; l3; l4 ], [ key t1; key t2; key t3; key t4 ]
+          | T5 (T (l1, t1), T (l2, t2), T (l3, t3), T (l4, t4), T (l5, t5)) ->
+            [ l1; l2; l3; l4; l5 ], [ key t1; key t2; key t3; key t4; key t5 ]
+        in
+        { Key.uid =
+            Uids.find_or_add uids_of_t labels ~name:(fun labels ->
+              Printf.sprintf "tuple%d" (List.length labels)
+              :: List.map labels ~f:(Option.value ~default:".")
+              |> String.concat ~sep:"_")
+        ; params
+        }
+      ;;
+    end
+  end
+end
+
+module type S0 = sig @@ portable
+  type t : any
+
+  val typename_of_t : t typename
+end
+
+module Make0 (X : Named_intf.S0) = struct
+  let uid = Uid.next X.name
+  let typename_of_t = { Key.uid; params = [] }
+end
+
+[%%template
+[@@@kind.default.explicit ka = (any, any mod separable, value, value_or_null, float64)]
+
+module type S1 = sig @@ portable
+  type ('a : ka) t : any
+
+  val typename_of_t : ('a : ka). 'a typename -> 'a t typename
+end
+
+module Make1 (X : Named_intf.S1 [@kind ka]) = struct
+  let uid = Uid.next X.name
+  let typename_of_t a = { Key.uid; params = [ a ] }
+end
+
+[@@@kind.default.explicit kb = (ka, value)]
+
+module type S2 = sig @@ portable
+  type ('a : ka, 'b : kb) t : any
+
+  val typename_of_t
+    : ('a : ka) ('b : kb).
+    'a typename -> 'b typename -> ('a, 'b) t typename
+end
+
+module Make2 (X : Named_intf.S2 [@kind.explicit ka kb]) = struct
+  let uid = Uid.next X.name
+  let typename_of_t a b = { Key.uid; params = [ a; b ] }
+end
+
+[@@@kind.default.explicit kc = (ka, value)]
+
+module type S3 = sig @@ portable
+  type ('a : ka, 'b : kb, 'c : kc) t : any
+
+  val typename_of_t
+    : ('a : ka) ('b : kb) ('c : kc).
+    'a typename -> 'b typename -> 'c typename -> ('a, 'b, 'c) t typename
+end
+
+module Make3 (X : Named_intf.S3 [@kind.explicit ka kb kc]) = struct
+  let uid = Uid.next X.name
+  let typename_of_t a b c = { Key.uid; params = [ a; b; c ] }
+end
+
+[@@@kind.default.explicit kd = (ka, value)]
+
+module type S4 = sig @@ portable
+  type ('a : ka, 'b : kb, 'c : kc, 'd : kd) t : any
+
+  val typename_of_t
+    : ('a : ka) ('b : kb) ('c : kc) ('d : kd).
+    'a typename
+    -> 'b typename
+    -> 'c typename
+    -> 'd typename
+    -> ('a, 'b, 'c, 'd) t typename
+end
+
+module Make4 (X : Named_intf.S4 [@kind.explicit ka kb kc kd]) = struct
+  let uid = Uid.next X.name
+  let typename_of_t a b c d = { Key.uid; params = [ a; b; c; d ] }
+end
+
+[@@@kind.default.explicit ke = (ka, value)]
+
+module type S5 = sig @@ portable
+  type ('a : ka, 'b : kb, 'c : kc, 'd : kd, 'e : ke) t : any
+
+  val typename_of_t
+    : ('a : ka) ('b : kb) ('c : kc) ('d : kd) ('e : ke).
+    'a typename
+    -> 'b typename
+    -> 'c typename
+    -> 'd typename
+    -> 'e typename
+    -> ('a, 'b, 'c, 'd, 'e) t typename
+end
+
+module Make5 (X : Named_intf.S5 [@kind.explicit ka kb kc kd ke]) = struct
+  let uid = Uid.next X.name
+  let typename_of_t a b c d e = { Key.uid; params = [ a; b; c; d; e ] }
+end]
+
+[%%template
+module type S1 = S1 [@kind.explicit value]
+module type S2 = S2 [@kind.explicit value value]
+module type S3 = S3 [@kind.explicit value value value]
+module type S4 = S4 [@kind.explicit value value value value]
+module type S5 = S5 [@kind.explicit value value value value value]]
+
+module Table (X : sig
+    type ('a : any) t
+  end) =
+struct
+  type data = Data : ('a : any). 'a t * 'a X.t -> data
+  type t = data Hashtbl.M(Key).t
+
+  let create int = Hashtbl.create (module Key) ~size:int
+  let mem table name = Hashtbl.mem table (key name)
+  let set table name data = Hashtbl.set table ~key:(key name) ~data:(Data (name, data))
+
+  let find (type a : any) table (name : a typename) =
+    let data = Hashtbl.find table (key name) in
+    match data with
+    | None -> None
+    | Some (Data (name', data)) ->
+      (fun (type b : any) (name' : b typename) (data : b X.t) ->
+        let Type_equal.T = (same_witness_exn name' name : (b, a) Type_equal.t) in
+        Some (data : a X.t))
+        name'
+        data
+  ;;
+end
+
+let fail uid_a uid_b =
+  let msg =
+    Printf.sprintf "Typename.Same_witness_exn %S %S" (Uid.name uid_a) (Uid.name uid_b)
+  in
+  failwith msg
+;;
+
+module Same_witness_exn_1 (A : S1) (B : S1) = struct
+  type t = { eq : 'a. ('a A.t, 'a B.t) Type_equal.t }
+
+  let witness =
+    let uid_a = uid (A.typename_of_t static) in
+    let uid_b = uid (B.typename_of_t static) in
+    if Uid.equal uid_a uid_b
+    then { eq = Stdlib.Obj.magic Type_equal.refl }
+    else fail uid_a uid_b
+  ;;
+end
+
+module Same_witness_exn_2 (A : S2) (B : S2) = struct
+  type t = { eq : 'a 'b. (('a, 'b) A.t, ('a, 'b) B.t) Type_equal.t }
+
+  let witness =
+    let uid_a = uid (A.typename_of_t static static) in
+    let uid_b = uid (B.typename_of_t static static) in
+    if Uid.equal uid_a uid_b
+    then { eq = Stdlib.Obj.magic Type_equal.refl }
+    else fail uid_a uid_b
+  ;;
+end
+
+module Same_witness_exn_3 (A : S3) (B : S3) = struct
+  type t = { eq : 'a 'b 'c. (('a, 'b, 'c) A.t, ('a, 'b, 'c) B.t) Type_equal.t }
+
+  let witness =
+    let uid_a = uid (A.typename_of_t static static static) in
+    let uid_b = uid (B.typename_of_t static static static) in
+    if Uid.equal uid_a uid_b
+    then { eq = Stdlib.Obj.magic Type_equal.refl }
+    else fail uid_a uid_b
+  ;;
+end
+
+module Same_witness_exn_4 (A : S4) (B : S4) = struct
+  type t = { eq : 'a 'b 'c 'd. (('a, 'b, 'c, 'd) A.t, ('a, 'b, 'c, 'd) B.t) Type_equal.t }
+
+  let witness =
+    let uid_a = uid (A.typename_of_t static static static static) in
+    let uid_b = uid (B.typename_of_t static static static static) in
+    if Uid.equal uid_a uid_b
+    then { eq = Stdlib.Obj.magic Type_equal.refl }
+    else fail uid_a uid_b
+  ;;
+end
+
+module Same_witness_exn_5 (A : S5) (B : S5) = struct
+  type t =
+    { eq :
+        'a 'b 'c 'd 'e. (('a, 'b, 'c, 'd, 'e) A.t, ('a, 'b, 'c, 'd, 'e) B.t) Type_equal.t
+    }
+
+  let witness =
+    let uid_a = uid (A.typename_of_t static static static static static) in
+    let uid_b = uid (B.typename_of_t static static static static static) in
+    if Uid.equal uid_a uid_b
+    then { eq = Stdlib.Obj.magic Type_equal.refl }
+    else fail uid_a uid_b
+  ;;
+end
