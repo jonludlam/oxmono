@@ -1,0 +1,7 @@
+(library
+  (public_name notty-community.lwt)
+  (synopsis "Notty Lwt+Unix IO")
+  (name notty_lwt)
+  (wrapped false)
+  (optional)
+  (libraries notty-community notty-community.unix lwt lwt.unix))

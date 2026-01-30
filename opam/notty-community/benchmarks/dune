@@ -1,0 +1,4 @@
+(executable
+  (name speed)
+  (enabled_if (= %{profile} "bench"))
+  (libraries notty-community notty-community.unix common unmark unmark.cli))

@@ -1,0 +1,4 @@
+(executable
+ (name gen_unicode_props)
+ (enabled_if (= %{profile} "regenerate"))
+ (libraries uucp))

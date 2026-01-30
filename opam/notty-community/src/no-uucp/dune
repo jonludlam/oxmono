@@ -1,0 +1,6 @@
+(rule
+ (targets notty_uucp_data.ml notty_uucp_data.mli)
+ (enabled_if (= %{profile} "regenerate"))
+ (action
+  (run ../../support/gen_unicode_props.exe))
+ (mode promote))
