@@ -1,0 +1,7 @@
+(library
+ (name unboxed_datatypes)
+ (public_name unboxed_datatypes)
+ (libraries base)
+ (preprocess
+  (pps ppx_jane))
+ (ocamlopt_flags :standard -O3))
