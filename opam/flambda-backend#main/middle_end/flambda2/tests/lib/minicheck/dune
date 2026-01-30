@@ -1,5 +1,0 @@
-(include_subdirs unqualified)
-
-(library
- (name minicheck)
- (ocamlopt_flags (:standard -O3)))

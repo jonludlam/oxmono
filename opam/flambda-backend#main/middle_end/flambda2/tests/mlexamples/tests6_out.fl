@@ -1,2 +1,0 @@
-let $camlTests6 = Block 0 (45) in
-cont done ($camlTests6)

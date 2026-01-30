@@ -1,3 +1,0 @@
-add_mutable_record { d0 = 88 ; d1 = 110 }
-copy_mutable_record { d0 = 88 ; d1 = 110 }
-add_fours_mutable_record { d0 = 88 ; d1 = 110; d2 = 88 ; d3 = 110 }

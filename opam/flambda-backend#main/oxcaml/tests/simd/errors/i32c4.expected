@@ -1,2 +1,0 @@
-File "i32c4.ml", line 1:
-Error: Did not find constant int arguments for caml_int32x4_const4
