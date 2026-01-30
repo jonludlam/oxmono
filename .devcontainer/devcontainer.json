@@ -46,10 +46,13 @@
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
-    "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    "DUNE_CACHE_ROOT":"/workspace/.cache",
+    "DUNE_CACHE_STORAGE_MODE":"hardlink",
+    "DUNE_CACHE":"enabled"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "sudo apt-get -y install opam && opam init --disable-sandboxing -any && opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default",
+  "postCreateCommand": "sudo apt-get -y install opam vim ripgrep curl && opam init --disable-sandboxing -any && opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default",
   "waitFor": "postStartCommand"
 }
