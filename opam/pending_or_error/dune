@@ -1,0 +1,6 @@
+(library
+ (name pending_or_error)
+ (public_name pending_or_error)
+ (preprocess
+  (pps ppx_diff.ppx_diff ppx_jane))
+ (libraries core))
