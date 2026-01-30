@@ -1,0 +1,5 @@
+(executables
+ (modes byte exe)
+ (names grep2)
+ (libraries core re2)
+ (preprocess no_preprocessing))

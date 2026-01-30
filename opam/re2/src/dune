@@ -1,0 +1,22 @@
+(library
+ (foreign_stubs
+  (language cxx)
+  (names stubs)
+  (flags
+   (:standard -x c++ \ -pedantic)
+   (-I re2_c/libre2)))
+ (name re2)
+ (public_name re2)
+ (libraries core re2_c regex_parser_intf jane_rope
+   ppx_stable_witness.stable_witness)
+ (virtual_deps conf-c++)
+ (c_library_flags :standard -lstdc++ -lpthread)
+ (flags :standard -w +52)
+ (preprocess
+  (pps ppx_jane -require-template-extension)))
+
+(rule
+ (targets ocaml_runtime_props.h)
+ (deps)
+ (action
+  (bash "echo \"#define OCAML_DEPENDENT_MEM_TRACKING true\" > %{targets}")))
