@@ -1,0 +1,5 @@
+(library
+ (name oklab_test)
+ (libraries core oklab)
+ (preprocess
+  (pps ppx_jane)))
