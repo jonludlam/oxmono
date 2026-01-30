@@ -1,0 +1,5 @@
+(library
+ (name validate_test)
+ (libraries base expect_test_helpers_core validate)
+ (preprocess
+  (pps ppx_jane)))

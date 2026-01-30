@@ -1,0 +1,100 @@
+open! Import
+open Std_internal
+
+type ('a, 'b) fn = 'a -> 'b
+
+module Result = struct
+  type 'a t =
+    | Rval of 'a
+    | Expt of exn
+
+  let return = function
+    | Rval v -> v
+    | Expt e -> raise e
+  ;;
+
+  let capture f x =
+    try Rval (f x) with
+    | e -> Expt e
+  ;;
+end
+
+let unit f =
+  let l = Lazy.from_fun f in
+  fun () -> Lazy.force l
+;;
+
+let unbounded ?(hashable = Hashtbl.Hashable.poly) f =
+  let cache = Hashtbl.create ~size:0 (Hashtbl.Hashable.to_key hashable) in
+  (* Allocate this closure at the call to [unbounded], not at each call to the memoized
+     function. *)
+  let really_call_f arg = Result.capture f arg in
+  fun arg -> Result.return (Hashtbl.findi_or_add cache arg ~default:really_call_f)
+;;
+
+(* the same but with a bound on cache size *)
+let lru ?(hashable = Hashtbl.Hashable.poly) ~max_cache_size f =
+  if max_cache_size <= 0
+  then failwithf "Memo.lru: max_cache_size of %i <= 0" max_cache_size ();
+  let cache = Hash_queue.create hashable in
+  fun arg ->
+    Result.return
+      (match Hash_queue.lookup_and_move_to_back cache arg with
+       | Some result -> result
+       | None ->
+         let result = Result.capture f arg in
+         Hash_queue.enqueue_back_exn cache arg result;
+         (* eject least recently used cache entry *)
+         if Hash_queue.length cache > max_cache_size
+         then ignore (Hash_queue.dequeue_front_exn cache : _ Result.t);
+         result)
+;;
+
+let general ?hashable ?cache_size_bound f =
+  match cache_size_bound with
+  | None -> unbounded ?hashable f
+  | Some n -> lru ?hashable ~max_cache_size:n f
+;;
+
+(* We expect [f_onestep] to be a one-step unrolled recursive function; see the mli. Hence,
+   here we create the memoized function _and_ pass it to [f_onestep] to be used for
+   recursive calls.
+
+   Note that we immediately apply [f_onestep] to its first argument here so that any
+   precomputation is performed when the user calls [recursive].
+
+   As an example, if someone writes this non-memoized code:
+
+   [ let rec f = let data = compute_without_using_f () in fun x -> ... f ... ]
+
+   and converts to memoization by doing:
+
+   {[
+     let f =
+       let f_onestep f = let data = compute_without_using_f () in fun x -> ... f ... in
+       recursive f_onestep
+   ]}
+
+   we want to compute [data] immediately. If we had
+   [fun x -> f_onestep (force memoized) x] below, we'd recompute [data] each time the user
+   calls [f] on an argument that hadn't yet been memoized. *)
+let recursive ~hashable ?cache_size_bound f_onestep =
+  let rec memoized =
+    lazy (general ~hashable ?cache_size_bound (f_onestep (fun x -> (force memoized) x)))
+  in
+  force memoized
+;;
+
+let of_comparator (type index) (module M : Comparator.S with type t = index) f =
+  let m = ref (Map.empty (module M)) in
+  fun (x : M.t) ->
+    let v =
+      match Map.find !m x with
+      | Some v -> v
+      | None ->
+        let v = Result.capture f x in
+        m := Map.set !m ~key:x ~data:v;
+        v
+    in
+    Result.return v
+;;

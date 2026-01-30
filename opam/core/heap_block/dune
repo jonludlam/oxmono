@@ -1,0 +1,14 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names heap_block_stubs))
+ (name heap_block)
+ (public_name core.heap_block)
+ (libraries base)
+ (js_of_ocaml
+  (javascript_files runtime.js))
+ (preprocess
+  (pps ppx_jane))
+ (wasm_of_ocaml
+  (javascript_files runtime.js)
+  (wasm_files runtime.wat)))

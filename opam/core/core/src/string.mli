@@ -1,0 +1,184 @@
+@@ portable
+
+(** This module extends {{!Base.String} [Base.String]}. *)
+
+(** @inline *)
+include module type of struct
+  include Base.String
+end
+
+type t = string [@@deriving bin_io ~localize, typerep, globalize]
+
+(** [Caseless] compares and hashes strings ignoring case, so that for example
+    [Caseless.equal "OCaml" "ocaml"] and [Caseless.("apple" < "Banana")] are [true], and
+    [Caseless.Map], [Caseless.Table] lookup and [Caseless.Set] membership is
+    case-insensitive.
+
+    [Caseless] also provides case-insensitive [is_suffix] and [is_prefix] functions, so
+    that for example [Caseless.is_suffix "OCaml" ~suffix:"AmL"] and
+    [Caseless.is_prefix "OCaml" ~prefix:"oc"] are [true]. *)
+module Caseless : sig
+  include module type of struct
+    include Caseless
+  end
+
+  type nonrec t = t [@@deriving bin_io ~localize, hash, sexp]
+
+  include%template
+    Comparable.S_binable [@mode local] [@modality portable] with type t := t
+
+  include Hashable.S_binable with type t := t
+end
+
+(** [slice t start stop] returns a new string including elements [t.(start)] through
+    [t.(stop-1)], normalized Python-style with the exception that [stop = 0] is treated as
+    [stop = length t]. *)
+val slice : t -> int -> int -> t
+
+(** [nget s i] gets the char at normalized position [i] in [s]. *)
+val nget : t -> int -> char
+
+[%%template:
+[@@@alloc.default a @ m = (heap @ global, stack @ local)]
+
+(** [take_while s ~f] returns the longest prefix of [s] satisfying [for_all prefix ~f]
+    (See [lstrip] to drop such a prefix) *)
+val take_while : t @ m -> f:local_ (char -> bool) -> t @ m
+
+(** [rtake_while s ~f] returns the longest suffix of [s] satisfying [for_all suffix ~f]
+    (See [rstrip] to drop such a suffix) *)
+val rtake_while : t @ m -> f:local_ (char -> bool) -> t @ m]
+
+include Hexdump.S with type t := t
+
+include%template
+  Identifiable.S
+  [@mode local] [@modality portable]
+  with type t := t
+   and type comparator_witness := comparator_witness
+
+include Diffable.S_atomic with type t := t
+include Quickcheckable.S with type t := t
+
+(** Like [quickcheck_generator], but without empty strings. *)
+val gen_nonempty : t Quickcheck.Generator.t
+
+(** Like [quickcheck_generator], but generate strings with the given distribution of
+    characters. *)
+val%template gen' : char Quickcheck.Generator.t @ p -> t Quickcheck.Generator.t @ p
+[@@mode p = (portable, nonportable)]
+
+(** Like [gen'], but without empty strings. *)
+val%template gen_nonempty'
+  :  char Quickcheck.Generator.t @ p
+  -> t Quickcheck.Generator.t @ p
+[@@mode p = (portable, nonportable)]
+
+(** Like [gen'], but generate strings with the given length. *)
+val%template gen_with_length
+  :  int
+  -> char Quickcheck.Generator.t @ p
+  -> t Quickcheck.Generator.t @ p
+[@@mode p = (portable, nonportable)]
+
+module type Utf = sig
+  include Utf
+
+  include%template
+    Identifiable.S
+    [@mode local]
+    with type t := t
+     and type comparator_witness := comparator_witness
+
+  include Quickcheckable.S with type t := t
+end
+
+(** Iterface for Unicode encodings, specialized for string representation. *)
+module type Utf_as_string = Utf with type t = private string
+
+module Utf8 :
+  Utf with type t = Utf8.t and type comparator_witness = Utf8.comparator_witness
+
+module Utf16le :
+  Utf with type t = Utf16le.t and type comparator_witness = Utf16le.comparator_witness
+
+module Utf16be :
+  Utf with type t = Utf16be.t and type comparator_witness = Utf16be.comparator_witness
+
+module Utf32le :
+  Utf
+  with type t = Base.String.Utf32le.t
+   and type comparator_witness = Base.String.Utf32le.comparator_witness
+
+module Utf32be :
+  Utf
+  with type t = Base.String.Utf32be.t
+   and type comparator_witness = Base.String.Utf32be.comparator_witness
+
+(** Note that [string] is already stable by itself, since as a primitive type it is an
+    integral part of the sexp / bin_io protocol. [String.Stable] exists only to introduce
+    [String.Stable.Set], [String.Stable.Map], [String.Stable.Table], and provide interface
+    uniformity with other stable types. *)
+module Stable : sig
+  module V1 : sig
+    include
+      module type of Stable_string.V1
+      with type t = t
+       and type comparator_witness = comparator_witness
+  end
+
+  module Utf8 : sig
+    module V1 : sig
+      type t = Utf8.t [@@deriving bin_io ~localize]
+
+      include
+        Stable_string.Identifiable_without_binio
+        with type t := t
+         and type comparator_witness = Utf8.comparator_witness
+    end
+  end
+
+  module Utf16le : sig
+    module V1 : sig
+      type t = Utf16le.t [@@deriving bin_io ~localize]
+
+      include
+        Stable_string.Identifiable_without_binio
+        with type t := t
+         and type comparator_witness = Utf16le.comparator_witness
+    end
+  end
+
+  module Utf16be : sig
+    module V1 : sig
+      type t = Utf16be.t [@@deriving bin_io ~localize]
+
+      include
+        Stable_string.Identifiable_without_binio
+        with type t := t
+         and type comparator_witness = Utf16be.comparator_witness
+    end
+  end
+
+  module Utf32le : sig
+    module V1 : sig
+      type t = Utf32le.t [@@deriving bin_io ~localize]
+
+      include
+        Stable_string.Identifiable_without_binio
+        with type t := t
+         and type comparator_witness = Utf32le.comparator_witness
+    end
+  end
+
+  module Utf32be : sig
+    module V1 : sig
+      type t = Utf32be.t [@@deriving bin_io ~localize]
+
+      include
+        Stable_string.Identifiable_without_binio
+        with type t := t
+         and type comparator_witness = Utf32be.comparator_witness
+    end
+  end
+end

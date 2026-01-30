@@ -1,0 +1,6 @@
+(library
+ (name filename_base)
+ (public_name core.filename_base)
+ (libraries base)
+ (preprocess
+  (pps ppx_jane -require-template-extension)))
