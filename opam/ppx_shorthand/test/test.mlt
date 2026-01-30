@@ -1,0 +1,165 @@
+open! Core
+
+module Structure_without_erasure = struct
+  type t = unit
+
+  include struct
+    type t = unit [@@deriving sexp]
+  end
+end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Multiple definition of the type name t.
+       Names must be unique in a given structure or signature.
+|}]
+
+module Signature_without_erasure : sig
+  type t = unit
+
+  include sig
+    type t = unit [@@deriving sexp]
+  end
+end =
+  Unit
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Multiple definition of the type name t.
+       Names must be unique in a given structure or signature.
+|}]
+
+(* Demonstrate some syntax errors. *)
+
+[%%rederive type t = unit]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+module _ : sig
+  [%%rederive: type t = unit]
+end = struct end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+[%%rederive type t = unit [@@foo]]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+module _ : sig
+  [%%rederive: type t = unit [@@bar]]
+end = struct end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+[%%rederive
+type t = unit [@@deriving foo] [@@deriving_inline bar]
+
+[@@@end]]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+module _ : sig
+  [%%rederive:
+  type t = unit [@@deriving foo] [@@deriving_inline bar]
+
+  [@@@end]]
+end = struct end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one @@deriving or @@deriving_inline attribute
+|}]
+
+[%%rederive type t [@@deriving foo]]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one type declaration with a manifest
+|}]
+
+module _ : sig
+  [%%rederive: type t [@@deriving foo]]
+end = struct end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one type declaration with a manifest
+|}]
+
+[%%rederive
+type t = unit
+type t' = unit]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one type declaration with a manifest
+|}]
+
+module _ : sig
+  [%%rederive:
+  type t = unit
+  type t' = unit]
+end = struct end
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: Expected exactly one type declaration with a manifest
+|}]
+
+let g = [%eta (f : _)]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: arrow expected
+|}]
+
+let f () = exclave_ "foo"
+let g = [%eta (f : _ -> _)]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error: This value is local
+       but is expected to be local to the parent region or global
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
+|}]
+
+(* [%eta1] already expands to include [@inline]. *)
+
+let f () = ()
+let[@inline] g = [%eta1 f]
+
+[%%expect
+  {|
+Line _, characters _-_:
+Error (warning 54 [duplicated-attribute]): the "inline" attribute is used more than once on this expression
+|}]
