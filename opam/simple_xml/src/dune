@@ -1,0 +1,6 @@
+(library
+ (name simple_xml)
+ (public_name simple_xml)
+ (libraries core sexplib ppx_stable_witness.stable_witness xmlm)
+ (preprocess
+  (pps ppx_jane)))
