@@ -1,0 +1,7 @@
+(library
+ (name float32)
+ (public_name unboxed.float32)
+ (libraries base bin_prot stdlib_stable)
+ (ocamlopt_flags :standard -O3)
+ (preprocess
+  (pps ppx_jane)))

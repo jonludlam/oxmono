@@ -1,0 +1,7 @@
+(library
+ (name nativeint_u)
+ (public_name unboxed.nativeint_u)
+ (libraries base bin_prot_unboxed_numbers core int32_u int64_u
+   ocaml_intrinsics_kernel)
+ (preprocess
+  (pps ppx_jane)))

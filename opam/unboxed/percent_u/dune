@@ -1,0 +1,6 @@
+(library
+ (name percent_u)
+ (public_name unboxed.percent_u)
+ (libraries base core float_u packed_float_option)
+ (preprocess
+  (pps ppx_jane)))

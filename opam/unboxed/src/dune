@@ -1,0 +1,7 @@
+(library
+ (name unboxed)
+ (public_name unboxed)
+ (libraries float32_u float_u int32_u int64_u nativeint_u packed_float_option
+   percent_u typerep)
+ (preprocess
+  (pps ppx_jane)))

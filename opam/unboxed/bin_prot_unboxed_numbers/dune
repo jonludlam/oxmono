@@ -1,0 +1,6 @@
+(library
+ (name bin_prot_unboxed_numbers)
+ (public_name unboxed.bin_prot_unboxed_numbers)
+ (libraries base float32)
+ (preprocess
+  (pps ppx_jane)))

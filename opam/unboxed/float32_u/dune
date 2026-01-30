@@ -1,0 +1,7 @@
+(library
+ (name float32_u)
+ (public_name unboxed.float32_u)
+ (libraries bin_prot_unboxed_numbers core float32 ocaml_intrinsics_kernel
+   stdlib_stable)
+ (preprocess
+  (pps ppx_jane)))

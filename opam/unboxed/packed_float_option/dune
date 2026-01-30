@@ -1,0 +1,7 @@
+(library
+ (name packed_float_option)
+ (public_name unboxed.packed_float_option)
+ (ocamlopt_flags :standard -flambda2-inline-max-depth 10)
+ (libraries core float_array float_u sexplib)
+ (preprocess
+  (pps ppx_jane)))
