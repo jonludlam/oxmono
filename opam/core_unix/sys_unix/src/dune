@@ -1,0 +1,9 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names sys_unix_stubs))
+ (name sys_unix)
+ (public_name core_unix.sys_unix)
+ (libraries core_kernel.caml_unix core)
+ (preprocess
+  (pps ppx_jane ppx_optcomp)))

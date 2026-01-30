@@ -1,0 +1,6 @@
+(library
+ (name interval_unix_test)
+ (libraries core expect_test_helpers_core interval_lib interval_lib_test
+   interval_unix time_float_unix)
+ (preprocess
+  (pps ppx_jane)))

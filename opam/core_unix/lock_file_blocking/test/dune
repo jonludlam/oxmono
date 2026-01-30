@@ -1,0 +1,6 @@
+(library
+ (name lock_file_blocking_test)
+ (libraries core core_unix expect_test_helpers_core file_path filename_unix
+   filesystem.core lock_file_blocking re sys_unix)
+ (preprocess
+  (pps ppx_jane)))

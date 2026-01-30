@@ -1,0 +1,20 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names nss_stubs timespec core_unix_stubs core_unix_time_stubs locale_stubs)
+  (flags
+   (:standard -D_LARGEFILE64_SOURCE)
+   ()))
+ (name core_unix)
+ (public_name core_unix)
+ (libraries core error_checking_mutex core_kernel.flags sexplib.unix
+   signal_unix spawn ppx_stable_witness.stable_witness unix)
+ (preprocess
+  (pps ppx_jane ppx_optcomp -require-template-extension))
+ (preprocessor_deps config.h))
+
+(rule
+ (targets config.h thread_id.h)
+ (deps)
+ (action
+  (bash "cp %{lib:jst-config:config.h} %{lib:jst-config:thread_id.h} .")))

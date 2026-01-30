@@ -1,0 +1,17 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names linux_ext_stubs))
+ (name linux_ext)
+ (public_name core_unix.linux_ext)
+ (libraries core_kernel.bounded_int_table core core_thread core_unix
+   filename_unix core_kernel.flags time_ns_unix)
+ (preprocessor_deps config.h)
+ (preprocess
+  (pps ppx_jane ppx_optcomp)))
+
+(rule
+ (targets config.h)
+ (deps)
+ (action
+  (bash "cp %{lib:jst-config:config.h} .")))

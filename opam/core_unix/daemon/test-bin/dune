@@ -1,0 +1,12 @@
+(rule
+ (deps daemonize_test.exe)
+ (action
+  (bash ./daemonize_test.exe))
+ (alias runtest))
+
+(executables
+ (modes byte exe)
+ (names daemonize_test)
+ (libraries core core_unix daemon unix)
+ (preprocess
+  (pps ppx_jane)))

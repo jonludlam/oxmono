@@ -1,0 +1,5 @@
+(library
+ (name sys_unix_test)
+ (libraries core sys_unix)
+ (preprocess
+  (pps ppx_jane)))

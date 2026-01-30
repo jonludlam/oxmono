@@ -1,0 +1,12 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names filename_unix_stubs)
+  (flags
+   (:standard -D_LARGEFILE64_SOURCE)
+   ()))
+ (name filename_unix)
+ (public_name core_unix.filename_unix)
+ (libraries core_kernel.caml_unix core sys_unix unix)
+ (preprocess
+  (pps ppx_jane)))
