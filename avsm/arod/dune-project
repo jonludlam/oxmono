@@ -12,14 +12,14 @@
  (name arod)
  (synopsis "Webserver for Bushel content")
  (description
-  "Arod is a tiny_httpd-based webserver that serves Bushel content
+  "Arod is a httpz-based webserver that serves Bushel content
    (notes, papers, projects, ideas, videos) as a website. It uses
    TOML configuration for easy deployment and includes support for
    responsive images, syntax highlighting, and feeds.")
  (depends
   (ocaml (>= 5.2))
   (bushel (>= 0.1))
-  (tiny_httpd (>= 0.17))
+  (httpz (>= 0.1))
   (htmlit (>= 0.1))
   (cmarkit (>= 0.3))
   (uri (>= 4.4))

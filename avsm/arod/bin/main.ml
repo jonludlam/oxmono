@@ -3,7 +3,7 @@
   SPDX-License-Identifier: ISC
  ---------------------------------------------------------------------------*)
 
-(** Arod webserver - a tiny_httpd based server for Bushel content *)
+(** Arod webserver - an httpz-based server for Bushel content *)
 
 (** {1 Logging} *)
 
@@ -39,6 +39,7 @@ let serve_cmd =
     Log.info (fun m -> m "Config:@.%a" Arod.Config.pp cfg);
     Eio_main.run @@ fun env ->
     let fs = Eio.Stdenv.fs env in
+    let net = Eio.Stdenv.net env in
     Log.info (fun m -> m "Loading entries from %s" cfg.paths.data_dir);
     let _entries = Arod.Model.init ~cfg fs in
     Log.info (fun m ->
@@ -54,11 +55,9 @@ let serve_cmd =
     (* Get all routes *)
     let routes = Arod.Handlers.all_routes cfg in
     (* Run the server *)
-    match Arod_server.run ~config:cfg ~memo_cache routes with
-    | Ok () -> 0
-    | Error e ->
-        Log.err (fun m -> m "Server error: %s" (Printexc.to_string e));
-        1
+    Eio.Switch.run @@ fun sw ->
+    Arod_server.run ~sw ~net ~config:cfg ~memo_cache routes;
+    0
   in
   let doc = "Start the Arod webserver." in
   let info = Cmd.info "serve" ~doc in
@@ -101,7 +100,7 @@ let main_cmd =
     [
       `S Manpage.s_description;
       `P
-        "Arod is a tiny_httpd-based webserver that serves Bushel content \
+        "Arod is an httpz-based webserver that serves Bushel content \
          (notes, papers, projects, ideas, videos) as a website.";
       `S "CONFIGURATION";
       `P "Configuration is read from ~/.config/arod/config.toml";

@@ -3,162 +3,336 @@
   SPDX-License-Identifier: ISC
  ---------------------------------------------------------------------------*)
 
-(** tiny_httpd server adapter for arod routes *)
+(** httpz + Eio server adapter for arod routes *)
+
+open Base
 
 let src = Logs.Src.create "arod.server" ~doc:"Arod server adapter"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-(** {1 Request/Response Conversion} *)
+(** {1 Buffer Helpers} *)
 
-let request_of_tiny req =
-  let meth =
-    match Tiny_httpd.Request.meth req with
-    | `GET -> `GET
-    | `POST -> `POST
-    | `PUT -> `PUT
-    | `DELETE -> `DELETE
-    | `HEAD -> `HEAD
-    | `OPTIONS -> `OPTIONS
-  in
-  let path = Tiny_httpd.Request.path req in
-  let query = Tiny_httpd.Request.query req in
-  (* Headers.t is already (string * string) list *)
-  let headers = Tiny_httpd.Request.headers req in
-  Arod.Route.Request.create ~meth ~path ~query ~headers
+let i16 = Httpz.Buf_write.i16
+let to_int = Httpz.Buf_write.to_int
 
-let response_to_tiny resp =
-  let status = Arod.Route.Response.status resp in
-  let headers = Arod.Route.Response.headers resp in
-  let body = Arod.Route.Response.body resp in
-  if status >= 200 && status < 300 then
-    Tiny_httpd.Response.make_string ~headers (Ok body)
-  else if status >= 300 && status < 400 then
-    (* Redirect *)
-    Tiny_httpd.Response.make_raw ~code:status ~headers body
+(** Response buffer size - 64KB for headers *)
+let response_buffer_size = 65536
+
+(** {1 Request Conversion} *)
+
+(** Parse query parameters from a query string *)
+let parse_query_string query_str =
+  if String.length query_str = 0 then []
   else
-    Tiny_httpd.Response.fail ~code:status "%s" body
+    let pairs = String.split query_str ~on:'&' in
+    List.filter_map pairs ~f:(fun pair ->
+        match String.lsplit2 pair ~on:'=' with
+        | None -> Some (pair, "")
+        | Some (key, value) -> Some (key, value))
 
-(** {1 Route Registration} *)
+(** Parse target into path and query parameters *)
+let parse_target target =
+  match String.lsplit2 target ~on:'?' with
+  | None -> (target, [])
+  | Some (path, query_str) -> (path, parse_query_string query_str)
 
-let register_routes server routes =
-  (* tiny_httpd uses a different routing model, so we use a catch-all handler
-     that dispatches through our route collection *)
-  Tiny_httpd.Server.add_route_handler ~meth:`GET server
-    Tiny_httpd.Route.(rest_of_path)
-    (fun path req ->
-      let arod_req = request_of_tiny req in
-      (* Reconstruct the full path including leading slash *)
-      let full_path = "/" ^ path in
-      let arod_req =
-        Arod.Route.Request.create
-          ~meth:(Arod.Route.Request.meth arod_req)
-          ~path:full_path
-          ~query:(Arod.Route.Request.query arod_req)
-          ~headers:(Arod.Route.Request.headers arod_req)
-      in
-      match Arod.Route.Routes.dispatch routes arod_req with
-      | Some resp -> response_to_tiny resp
-      | None -> Tiny_httpd.Response.fail ~code:404 "Not Found");
-  (* Also handle the root path *)
-  Tiny_httpd.Server.add_route_handler ~meth:`GET server
-    Tiny_httpd.Route.(exact_path "/" return)
-    (fun req ->
-      let arod_req = request_of_tiny req in
-      match Arod.Route.Routes.dispatch routes arod_req with
-      | Some resp -> response_to_tiny resp
-      | None -> Tiny_httpd.Response.fail ~code:404 "Not Found")
+(** Convert httpz method to arod method *)
+let meth_of_httpz = function
+  | Httpz.Method.Get -> `GET
+  | Httpz.Method.Post -> `POST
+  | Httpz.Method.Put -> `PUT
+  | Httpz.Method.Delete -> `DELETE
+  | Httpz.Method.Head -> `HEAD
+  | Httpz.Method.Options -> `OPTIONS
+  | Httpz.Method.Connect -> `GET (* fallback *)
+  | Httpz.Method.Trace -> `GET (* fallback *)
+  | Httpz.Method.Patch -> `POST (* fallback *)
 
-(** {1 Server Lifecycle} *)
+(** Convert httpz headers to arod headers (must be called in local scope) *)
+let convert_headers buf headers =
+  let rec loop acc = function
+    | [] -> acc
+    | (h : Httpz.Header.t) :: rest ->
+        let name =
+          match h.name with
+          | Httpz.Header_name.Other -> Httpz.Span.to_string buf h.name_span
+          | other -> Httpz.Header_name.canonical other
+        in
+        let value = Httpz.Span.to_string buf h.value in
+        loop ((name, value) :: acc) rest
+  in
+  loop [] headers
 
-let create_server ~config =
-  Tiny_httpd.create ~addr:config.Arod.Config.server.host
-    ~port:config.Arod.Config.server.port ()
+(** Convert httpz request to arod request (headers must already be converted) *)
+let request_of_httpz buf (req : Httpz.Req.t) converted_headers =
+  let meth = meth_of_httpz req.#meth in
+  let target = Httpz.Span.to_string buf req.#target in
+  let path, query = parse_target target in
+  Arod.Route.Request.create ~meth ~path ~query ~headers:converted_headers
+
+(** {1 Response Writing} *)
+
+(** Convert integer status code to httpz status *)
+let httpz_status_of_int = function
+  | 100 -> Httpz.Res.Continue
+  | 101 -> Httpz.Res.Switching_protocols
+  | 200 -> Httpz.Res.Success
+  | 201 -> Httpz.Res.Created
+  | 202 -> Httpz.Res.Accepted
+  | 204 -> Httpz.Res.No_content
+  | 206 -> Httpz.Res.Partial_content
+  | 301 -> Httpz.Res.Moved_permanently
+  | 302 -> Httpz.Res.Found
+  | 303 -> Httpz.Res.See_other
+  | 304 -> Httpz.Res.Not_modified
+  | 307 -> Httpz.Res.Temporary_redirect
+  | 308 -> Httpz.Res.Permanent_redirect
+  | 400 -> Httpz.Res.Bad_request
+  | 401 -> Httpz.Res.Unauthorized
+  | 403 -> Httpz.Res.Forbidden
+  | 404 -> Httpz.Res.Not_found
+  | 405 -> Httpz.Res.Method_not_allowed
+  | 406 -> Httpz.Res.Not_acceptable
+  | 408 -> Httpz.Res.Request_timeout
+  | 409 -> Httpz.Res.Conflict
+  | 410 -> Httpz.Res.Gone
+  | 411 -> Httpz.Res.Length_required
+  | 412 -> Httpz.Res.Precondition_failed
+  | 413 -> Httpz.Res.Payload_too_large
+  | 414 -> Httpz.Res.Uri_too_long
+  | 415 -> Httpz.Res.Unsupported_media_type
+  | 416 -> Httpz.Res.Range_not_satisfiable
+  | 417 -> Httpz.Res.Expectation_failed
+  | 422 -> Httpz.Res.Unprocessable_entity
+  | 426 -> Httpz.Res.Upgrade_required
+  | 428 -> Httpz.Res.Precondition_required
+  | 429 -> Httpz.Res.Too_many_requests
+  | 500 -> Httpz.Res.Internal_server_error
+  | 501 -> Httpz.Res.Not_implemented
+  | 502 -> Httpz.Res.Bad_gateway
+  | 503 -> Httpz.Res.Service_unavailable
+  | 504 -> Httpz.Res.Gateway_timeout
+  | 505 -> Httpz.Res.Http_version_not_supported
+  | _ -> Httpz.Res.Internal_server_error (* fallback for unknown codes *)
+
+(** Write response headers to buffer, returns header length and body *)
+let write_response buf ~off ~keep_alive version resp =
+  let status = httpz_status_of_int (Arod.Route.Response.status resp) in
+  let off = Httpz.Res.write_status_line buf ~off status version in
+  (* Write headers using a recursive loop to handle int16# *)
+  let rec write_headers off = function
+    | [] -> off
+    | (name, value) :: rest ->
+        let off = Httpz.Res.write_header buf ~off name value in
+        write_headers off rest
+  in
+  let off = write_headers off (Arod.Route.Response.headers resp) in
+  let body = Arod.Route.Response.body resp in
+  let off = Httpz.Res.write_content_length buf ~off (String.length body) in
+  let off = Httpz.Res.write_connection buf ~off ~keep_alive in
+  let off = Httpz.Res.write_crlf buf ~off in
+  (to_int off, body)
+
+(** {1 Connection State} *)
+
+type 'a conn_state = {
+  flow : 'a Eio.Net.stream_socket;
+  read_buf : Httpz.buffer;
+  write_buf : Httpz.buffer;
+  mutable read_len : int;
+  mutable keep_alive : bool;
+}
+
+let create_conn flow =
+  {
+    flow;
+    read_buf = Httpz.create_buffer ();
+    write_buf =
+      Bigarray.Array1.create Bigarray.char Bigarray.c_layout response_buffer_size;
+    read_len = 0;
+    keep_alive = true;
+  }
+
+(** {1 Memoization} *)
 
 let default_memoized_paths =
   [ "/feeds/"; "/sitemap"; "/perma."; "/bushel/graph.json" ]
 
 let should_memoize path memoized_paths =
-  List.exists (fun prefix -> String.length path >= String.length prefix &&
-    String.sub path 0 (String.length prefix) = prefix) memoized_paths
+  List.exists memoized_paths ~f:(fun prefix ->
+      String.length path >= String.length prefix
+      && String.equal (String.sub path ~pos:0 ~len:(String.length prefix)) prefix)
 
-let run ~config ?memo_cache ?(memoized_paths = default_memoized_paths) routes =
-  let server = create_server ~config in
-  (* Add logging middleware *)
-  Tiny_httpd.add_middleware server ~stage:(`Stage 1) (fun h req ->
-      let start_time = Unix.gettimeofday () in
-      let resp = h req in
-      let elapsed = Unix.gettimeofday () -. start_time in
-      Log.info (fun m ->
-          m "%s %s - %.3fs"
-            (Tiny_httpd.Meth.to_string (Tiny_httpd.Request.meth req))
-            (Tiny_httpd.Request.path req) elapsed);
-      resp);
-  (* Register all routes with optional memoization *)
-  let routes_with_memo =
-    match memo_cache with
-    | None -> routes
-    | Some _cache ->
-        (* Wrap memoized paths *)
-        Arod.Route.Routes.fold
-          (fun route acc ->
-            (* For now we just use the routes as-is; memoization could be added
-               by wrapping individual handlers, but that requires more intrusive
-               changes to the route structure. Instead, we apply memoization at
-               dispatch time. *)
-            Arod.Route.Routes.add route acc)
-          routes Arod.Route.Routes.empty
+(** {1 Server Implementation} *)
+
+(** Send error response *)
+let send_error conn status message version =
+  let buf = conn.write_buf in
+  let off = Httpz.Res.write_status_line buf ~off:(i16 0) status version in
+  let off =
+    Httpz.Res.write_header_name buf ~off Httpz.Header_name.Content_type
+      "text/plain"
   in
-  (* Use a dispatch wrapper that applies memoization *)
-  Tiny_httpd.Server.add_route_handler ~meth:`GET server
-    Tiny_httpd.Route.rest_of_path
-    (fun path req ->
-      let arod_req = request_of_tiny req in
-      let full_path = "/" ^ path in
-      let arod_req =
-        Arod.Route.Request.create
-          ~meth:(Arod.Route.Request.meth arod_req)
-          ~path:full_path
-          ~query:(Arod.Route.Request.query arod_req)
-          ~headers:(Arod.Route.Request.headers arod_req)
-      in
+  let off = Httpz.Res.write_content_length buf ~off (String.length message) in
+  let off = Httpz.Res.write_connection buf ~off ~keep_alive:conn.keep_alive in
+  let off = Httpz.Res.write_crlf buf ~off in
+  let header_len = to_int off in
+  (* Write headers then body *)
+  Eio.Flow.write conn.flow
+    [
+      Cstruct.of_bigarray conn.write_buf ~off:0 ~len:header_len;
+      Cstruct.of_string message;
+    ]
+
+(** Read more data into buffer *)
+let read_more conn =
+  if conn.read_len >= Httpz.buffer_size then `Buffer_full
+  else
+    let available = Httpz.buffer_size - conn.read_len in
+    let cs = Cstruct.of_bigarray conn.read_buf ~off:conn.read_len ~len:available in
+    match Eio.Flow.single_read conn.flow cs with
+    | n ->
+        conn.read_len <- conn.read_len + n;
+        `Ok n
+    | exception End_of_file -> `Eof
+
+(** Shift buffer contents to remove processed data *)
+let shift_buffer conn consumed =
+  if consumed > 0 && consumed < conn.read_len then begin
+    for i = 0 to conn.read_len - consumed - 1 do
+      Bigarray.Array1.set conn.read_buf i
+        (Bigarray.Array1.get conn.read_buf (consumed + i))
+    done;
+    conn.read_len <- conn.read_len - consumed
+  end
+  else if consumed >= conn.read_len then conn.read_len <- 0
+
+(** Handle one request *)
+let handle_request conn ~routes ~memo_cache ~memoized_paths =
+  let buf = conn.read_buf in
+  let len = conn.read_len in
+  let len16 = i16 len in
+  let #(status, req, headers) =
+    Httpz.parse buf ~len:len16 ~limits:Httpz.default_limits
+  in
+  let body_off = to_int req.#body_off in
+  let version = req.#version in
+  match status with
+  | Httpz.Buf_read.Complete ->
+      (* Convert headers first while they're in local scope *)
+      let converted_headers = convert_headers buf headers in
+      (* Convert to arod request *)
+      let arod_req = request_of_httpz buf req converted_headers in
+      let path = Arod.Route.Request.path arod_req in
+      (* Dispatch with optional memoization *)
       let dispatch_fn =
         match memo_cache with
-        | Some cache when should_memoize full_path memoized_paths ->
+        | Some cache when should_memoize path memoized_paths ->
             fun req ->
               Arod.Memo.memoize cache
                 (fun r ->
-                  match Arod.Route.Routes.dispatch routes_with_memo r with
+                  match Arod.Route.Routes.dispatch routes r with
                   | Some resp -> resp
                   | None -> Arod.Route.Response.not_found)
                 req
-        | _ -> fun req ->
-            match Arod.Route.Routes.dispatch routes_with_memo req with
-            | Some resp -> resp
-            | None -> Arod.Route.Response.not_found
-      in
-      response_to_tiny (dispatch_fn arod_req));
-  (* Handle root path *)
-  Tiny_httpd.Server.add_route_handler ~meth:`GET server
-    Tiny_httpd.Route.(exact_path "/" return)
-    (fun req ->
-      let arod_req = request_of_tiny req in
-      let dispatch_fn =
-        match memo_cache with
-        | Some cache when should_memoize "/" memoized_paths ->
+        | _ -> (
             fun req ->
-              Arod.Memo.memoize cache
-                (fun r ->
-                  match Arod.Route.Routes.dispatch routes_with_memo r with
-                  | Some resp -> resp
-                  | None -> Arod.Route.Response.not_found)
-                req
-        | _ -> fun req ->
-            match Arod.Route.Routes.dispatch routes_with_memo req with
-            | Some resp -> resp
-            | None -> Arod.Route.Response.not_found
+              match Arod.Route.Routes.dispatch routes req with
+              | Some resp -> resp
+              | None -> Arod.Route.Response.not_found)
       in
-      response_to_tiny (dispatch_fn arod_req));
+      let resp = dispatch_fn arod_req in
+      (* Log request *)
+      Log.info (fun m ->
+          m "%s %s - %d"
+            (Arod.Route.meth_to_string (Arod.Route.Request.meth arod_req))
+            path (Arod.Route.Response.status resp));
+      (* Write response *)
+      conn.keep_alive <- req.#keep_alive;
+      let header_len, body =
+        write_response conn.write_buf ~off:(i16 0) ~keep_alive:conn.keep_alive
+          version resp
+      in
+      Eio.Flow.write conn.flow
+        [
+          Cstruct.of_bigarray conn.write_buf ~off:0 ~len:header_len;
+          Cstruct.of_string body;
+        ];
+      (* Calculate consumed bytes *)
+      let body_span = Httpz.Req.body_span ~len:len16 req in
+      let body_span_len = Httpz.Span.len body_span in
+      let body_span_off = Httpz.Span.off body_span in
+      let consumed =
+        if body_span_len > 0 then body_span_off + body_span_len else body_off
+      in
+      shift_buffer conn consumed;
+      if conn.keep_alive then `Continue else `Close
+  | Httpz.Buf_read.Partial -> `Need_more
+  | Httpz.Buf_read.Headers_too_large | Httpz.Buf_read.Content_length_overflow ->
+      conn.keep_alive <- false;
+      send_error conn Httpz.Res.Payload_too_large "Payload Too Large"
+        Httpz.Version.Http_1_1;
+      `Close
+  | Httpz.Buf_read.Bare_cr_detected | Httpz.Buf_read.Ambiguous_framing ->
+      conn.keep_alive <- false;
+      send_error conn Httpz.Res.Bad_request "Bad Request" Httpz.Version.Http_1_1;
+      `Close
+  | Httpz.Buf_read.Missing_host_header ->
+      conn.keep_alive <- false;
+      send_error conn Httpz.Res.Bad_request "Missing Host Header"
+        Httpz.Version.Http_1_1;
+      `Close
+  | _ ->
+      conn.keep_alive <- false;
+      send_error conn Httpz.Res.Bad_request "Bad Request" Httpz.Version.Http_1_1;
+      `Close
+
+(** Send payload too large error and close connection *)
+let send_payload_too_large conn =
+  conn.keep_alive <- false;
+  send_error conn Httpz.Res.Payload_too_large "Payload Too Large"
+    Httpz.Version.Http_1_1
+
+(** Handle connection loop *)
+let handle_connection conn ~routes ~memo_cache ~memoized_paths =
+  let handle_read_result ~continue = function
+    | `Eof -> ()
+    | `Buffer_full -> send_payload_too_large conn
+    | `Ok _ -> continue ()
+  in
+  let rec loop () =
+    if conn.read_len = 0 then
+      handle_read_result ~continue:loop (read_more conn)
+    else
+      match handle_request conn ~routes ~memo_cache ~memoized_paths with
+      | `Continue -> loop ()
+      | `Close -> ()
+      | `Need_more -> handle_read_result ~continue:loop (read_more conn)
+  in
+  loop ()
+
+(** Handle a single client connection *)
+let handle_client ~routes ~memo_cache ~memoized_paths flow _addr =
+  let conn = create_conn flow in
+  try handle_connection conn ~routes ~memo_cache ~memoized_paths
+  with exn ->
+    Log.err (fun m -> m "Connection error: %s" (Exn.to_string exn))
+
+(** {1 Public API} *)
+
+let run ~sw ~net ~config ?memo_cache ?(memoized_paths = default_memoized_paths)
+    routes =
+  let addr =
+    `Tcp (Eio.Net.Ipaddr.V4.any, config.Arod.Config.server.port)
+  in
+  let socket = Eio.Net.listen net ~sw ~backlog:128 ~reuse_addr:true addr in
   Log.app (fun m ->
       m "Listening on http://%s:%d" config.server.host config.server.port);
-  Tiny_httpd.run server
+  (* Accept connections in a loop *)
+  while true do
+    Eio.Net.accept_fork socket ~sw
+      ~on_error:(fun exn ->
+        Log.err (fun m -> m "Accept error: %s" (Exn.to_string exn)))
+      (fun flow addr -> handle_client ~routes ~memo_cache ~memoized_paths flow addr)
+  done
