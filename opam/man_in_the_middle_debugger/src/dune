@@ -1,0 +1,6 @@
+(library
+ (name man_in_the_middle_debugger)
+ (public_name man_in_the_middle_debugger)
+ (libraries angstrom angstrom-async async core)
+ (preprocess
+  (pps ppx_jane)))
