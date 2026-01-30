@@ -1,0 +1,6 @@
+(library
+ (name expect_test_helpers_async_test)
+ (libraries async core expect_test_helpers_async expect_test_helpers_core
+   core_unix.time_float_unix)
+ (preprocess
+  (pps ppx_jane)))
