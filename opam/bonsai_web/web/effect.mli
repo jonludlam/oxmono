@@ -1,0 +1,61 @@
+open! Core
+open! Async_kernel
+open! Import
+open Bonsai.For_open
+include module type of Virtual_dom.Vdom.Effect
+include module type of Ui_effect_of_deferred
+
+module Focus : sig
+  type nonrec t =
+    { attr : Vdom.Attr.t
+    ; focus : unit t
+    ; blur : unit t
+    }
+
+  (** [on_effect] returns a [Vdom.Attr.t] and two [unit Effect.t]s that focus/blur the
+      [Vdom.Node.t] containing the [Vdom.Attr.t]. The attr should not be used on more than
+      one [Vdom.Node.t], as only the first element will be focused/blurred when the effect
+      runs.
+
+      When [name_for_testing] is provided, the focus and blur effects will print in test
+      mode. They will be a no-op otherwise.
+
+      If [prevent_scroll] is true, the browser will not scroll the element into view after
+      focusing it. The default behavior is to scroll into view. *)
+  val on_effect
+    :  ?name_for_testing:string
+    -> ?prevent_scroll:bool
+    -> unit
+    -> local_ Bonsai.graph
+    -> t Bonsai.t
+
+  (** [on_activate] will focus the element that the returned attr is attached to when this
+      computation is activated. See [Bonsai.Edge] for more details on the component
+      lifecycle.
+
+      When [name_for_testing] is provided, the focus will print in test mode. It will be a
+      no-op otherwise.
+
+      If [prevent_scroll] is true, the browser will not scroll the element into view after
+      focusing it. The default behavior is to scroll into view. *)
+  val on_activate
+    :  ?name_for_testing:string
+    -> ?prevent_scroll:bool
+    -> unit
+    -> local_ Bonsai.graph
+    -> Vdom.Attr.t Bonsai.t
+end
+
+(** [reload_page] will cause a page reload if running normally in a browser. When running
+    in node/benchmarks/tests, it will just print that a reload would normally occur. *)
+val reload_page : unit Effect.t
+
+(** [alert] will cause an alert box to pop up with your provided message. *)
+val alert : string -> unit Effect.t
+
+(** [set_document_title] will set the title of the page to the provided string *)
+val set_document_title : string -> unit Effect.t
+
+(** [on_change_set_document_title] will cause the title of the page to be set to the
+    provided [string Bonsai.t] and updated whenever its value changes *)
+val on_change_set_document_title : string Bonsai.t -> local_ Bonsai.graph -> unit
