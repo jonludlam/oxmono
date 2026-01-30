@@ -1,0 +1,27 @@
+(env (dev (flags :standard -w +a-4-42-69-70 -warn-error -a+31)))
+
+(library
+ (public_name curl)
+ (wrapped false)
+ (foreign_stubs
+  (language c)
+  (flags -DHAVE_CONFIG_H :standard (:include cflags.sexp))
+  (names curl-helper))
+ (c_library_flags :standard (:include clibs.sexp))
+ (libraries bigarray unix)
+ (modules curl))
+
+(library
+ (name curl_lwt)
+ (public_name curl_lwt)
+ (wrapped false)
+ (libraries curl lwt.unix)
+ (modules curl_lwt))
+
+(deprecated_library_name
+ (old_public_name curl.lwt)
+ (new_public_name curl_lwt))
+
+(rule
+ (targets config.h cflags.sexp clibs.sexp)
+ (action (run config/discover.exe)))

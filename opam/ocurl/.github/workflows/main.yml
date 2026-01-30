@@ -1,0 +1,51 @@
+name: Builds, tests & co
+
+on:
+  - push
+  - pull_request
+
+permissions: read-all
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        ocaml-compiler:
+          - '5'
+        include:
+          - os: ubuntu-latest
+            ocaml-compiler: '4.11'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout tree
+        uses: actions/checkout@v4
+
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Fix Cygwin
+        if: runner.os == 'Windows'
+        shell: bash -eo pipefail -o igncr {0}
+        run: sed -i -e 's/binary/noacl,&/' /etc/fstab
+
+      - name: Install opam dependencies
+        run: |
+          # Work around https://github.com/ocaml/setup-ocaml/issues/899
+          opam install conf-pkg-config
+          opam install . --deps-only --with-test --with-dev-setup
+
+      - run: opam exec -- dune build
+
+      - run: opam exec -- dune runtest
+        if: ${{ runner.os != 'Windows' }}
+        # libcurl (and prob. others) need a rebuild after the OpenSSL 3 upgrade
+        # https://cygwin.com/pipermail/cygwin/2025-March/257664.html
