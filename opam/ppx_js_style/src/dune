@@ -1,0 +1,8 @@
+(library
+ (name ppx_js_style)
+ (public_name ppx_js_style)
+ (kind ppx_rewriter)
+ (libraries ocaml-compiler-libs.common compiler-libs.common odoc-parser
+   ppx_template.expander ppxlib ppxlib_jane ppxlib.stdppx)
+ (preprocess
+  (pps ppxlib.metaquot)))
