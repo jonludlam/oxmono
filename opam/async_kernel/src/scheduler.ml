@@ -1,0 +1,453 @@
+open! Core
+open! Import
+open! Deferred_std
+module Deferred = Deferred1
+module Scheduler = Scheduler1
+module Stream = Async_stream
+include (Scheduler : module type of Scheduler with module Bvar := Scheduler.Bvar)
+
+let t = Scheduler.t
+
+include Monitor.Exported_for_scheduler
+
+let find_local key = Execution_context.find_local (current_execution_context (t ())) key
+
+let with_local key value ~f =
+  let t = t () in
+  let execution_context =
+    Execution_context.with_local (current_execution_context t) key value
+  in
+  with_execution_context t execution_context ~f
+;;
+
+let main_execution_context = (t ()).main_execution_context
+
+module Project : sig @@ portable
+  val external_jobs
+    :  (t, 'k) Capsule.Data.t
+    -> ( External_job.t Unique.Lockfree_single_consumer_queue.t Modes.Contended.t
+         , 'k )
+         Capsule.Data.t
+
+  val thread_safe_external_job_hook
+    :  (t, 'k) Capsule.Data.t
+    -> ((unit -> unit) Atomic.t, 'k) Capsule.Data.t
+end = struct
+  (* It it always sound to project out an immutable field of a record within a
+     [Capsule.Data.t] into a [Capsule.Data.t] within the same capsule. Soon this will be
+     supported by the language directly, but in the meantime we have to use magic. *)
+
+  external magic_unwrap_capsule : ('a, 'k) Capsule.Data.t -> 'a @@ portable = "%identity"
+
+  let external_jobs t =
+    Capsule.Expert.Data.inject { contended = (magic_unwrap_capsule t).external_jobs }
+  ;;
+
+  let thread_safe_external_job_hook t =
+    Capsule.Expert.Data.inject (magic_unwrap_capsule t).thread_safe_external_job_hook
+  ;;
+end
+
+let can_run_a_job t =
+  num_pending_jobs t > 0
+  || Bvar.has_any_waiters t.yield
+  || Bvar.has_any_waiters t.yield_until_no_jobs_remain
+;;
+
+let has_upcoming_event t = Synchronous_time_source.has_next_alarm t.time_source
+let next_upcoming_event t = Synchronous_time_source.next_alarm_runs_at t.time_source
+
+let next_upcoming_event_exn t =
+  Synchronous_time_source.next_alarm_runs_at_exn t.time_source
+;;
+
+let event_precision t = Timing_wheel.alarm_precision (events t)
+let cycle_start t = t.cycle_start
+
+let run_every_cycle_start t ~f =
+  (* Using an array rather than a list for cache efficiency. This and
+     [run_every_cycle_end] should only be called during program initialization, so the
+     allocation and garbage creation should not be an issue.
+
+     Note that calling this function N times takes O(N^2) time, but this should be fine
+     because N is small. Same for [run_every_cycle_end]. *)
+  t.run_every_cycle_start <- Array.append [| f |] t.run_every_cycle_start
+;;
+
+let run_every_cycle_end t ~f =
+  t.run_every_cycle_end <- Array.append [| f |] t.run_every_cycle_end
+;;
+
+let add_every_cycle_start_hook t ~f =
+  let handle = Types.Cycle_hook_handle.create () in
+  Hashtbl.add_exn t.run_every_cycle_start_state ~key:handle ~data:f;
+  run_every_cycle_start t ~f;
+  handle
+;;
+
+let add_every_cycle_end_hook t ~f =
+  let handle = Types.Cycle_hook_handle.create () in
+  Hashtbl.add_exn t.run_every_cycle_end_state ~key:handle ~data:f;
+  run_every_cycle_end t ~f;
+  handle
+;;
+
+let array_remove_first arr ~f =
+  match Array.findi arr ~f with
+  | None -> None
+  | Some (idx, _) ->
+    Some
+      (Array.init
+         (Array.length arr - 1)
+         ~f:(fun i -> if i < idx then arr.(i) else arr.(i + 1)))
+;;
+
+let remove_single_cycle_hook arr f =
+  (* Remove a single instance of [f] from [arr]. More than one instance may be present,
+     but removal is reference-counted by [run_every_cycle_(start|end)_state] tables. *)
+  match array_remove_first ~f:(fun _ g -> phys_equal f g) arr with
+  | Some arr -> arr
+  | None ->
+    (* This should be unreachable, see the [invariant] in [scheduler1.ml]. *)
+    raise_s
+      [%message
+        "Scheduler.remove_single_cycle_hook called with a hook that isn't registered"]
+;;
+
+let remove_every_cycle_start_hook_exn t handle =
+  match Hashtbl.find_and_remove t.run_every_cycle_start_state handle with
+  | None ->
+    failwith "Attempted to remove a cycle start hook which has already been removed."
+  | Some f ->
+    t.run_every_cycle_start <- remove_single_cycle_hook t.run_every_cycle_start f
+;;
+
+let remove_every_cycle_end_hook_exn t handle =
+  match Hashtbl.find_and_remove t.run_every_cycle_end_state handle with
+  | None ->
+    failwith "Attempted to remove a cycle end hook which has already been removed."
+  | Some f -> t.run_every_cycle_end <- remove_single_cycle_hook t.run_every_cycle_end f
+;;
+
+let map_cycle_times t ~f =
+  Stream.create (fun tail ->
+    run_every_cycle_start t ~f:(fun () -> Tail.extend tail (f t.last_cycle_time)))
+;;
+
+let long_cycles t ~at_least =
+  Stream.create (fun tail ->
+    run_every_cycle_start t ~f:(fun () ->
+      if Time_ns.Span.( >= ) t.last_cycle_time at_least
+      then Tail.extend tail t.last_cycle_time))
+;;
+
+let cycle_num_jobs t =
+  Stream.create (fun tail ->
+    run_every_cycle_start t ~f:(fun () -> Tail.extend tail t.last_cycle_num_jobs))
+;;
+
+let cycle_count t = t.cycle_count
+
+let set_max_num_jobs_per_priority_per_cycle t int =
+  t.max_num_jobs_per_priority_per_cycle
+  <- Max_num_jobs_per_priority_per_cycle.create_exn int
+;;
+
+let max_num_jobs_per_priority_per_cycle t =
+  Max_num_jobs_per_priority_per_cycle.raw t.max_num_jobs_per_priority_per_cycle
+;;
+
+let set_thread_safe_external_job_hook t f = Atomic.set t.thread_safe_external_job_hook f
+
+let has_pending_external_jobs t =
+  not (Unique.Lockfree_single_consumer_queue.is_empty t.external_jobs)
+;;
+
+let portable_enqueue_external_job t execution_context f a =
+  let external_jobs = t |> Project.external_jobs |> Capsule.Expert.Data.project in
+  let job = External_job.Encapsulated.create ~execution_context ~f ~a in
+  Unique.Lockfree_single_consumer_queue.enqueue external_jobs.contended job;
+  let thread_safe_external_job_hook =
+    t
+    |> Project.thread_safe_external_job_hook
+    |> Capsule.Expert.Data.project
+    |> Atomic.get
+  in
+  thread_safe_external_job_hook ()
+;;
+
+let[@inline] thread_safe_enqueue_external_job t execution_context f a =
+  let execution_context = Capsule.Initial.Data.wrap execution_context in
+  let f =
+    Capsule.Expert.(Data.wrap_once ~access:(Capsule.Access.unbox initial)) (fun #(_, a) ->
+      f a)
+  in
+  let a = Capsule.Expert.(Data.wrap_unique ~access:(Capsule.Access.unbox initial)) a in
+  portable_enqueue_external_job (Capsule.Initial.Data.wrap t) execution_context f a
+;;
+
+let set_event_added_hook t f = t.event_added_hook <- Some f
+let set_job_queued_hook t f = t.job_queued_hook <- Some f
+
+let create_alarm t f =
+  let execution_context = current_execution_context t in
+  Gc.Expert.Alarm.create (fun () ->
+    if not t.reset_in_forked_process
+    then
+      thread_safe_enqueue_external_job
+        t
+        execution_context
+        (fun { aliased = f } -> f ())
+        { aliased = f })
+;;
+
+let add_finalizer t heap_block f =
+  let execution_context = current_execution_context t in
+  let finalizer { aliased = heap_block } =
+    (* Here we can be in any thread, and may not be holding the async lock. So, we can
+       only do thread-safe things.
+
+       By putting [heap_block] in [external_jobs], we are keeping it alive until the next
+       time the async scheduler gets around to dequeueing it. Calling
+       [t.thread_safe_external_job_hook] ensures that will happen in short order. Thus, we
+       are not dramatically increasing the lifetime of [heap_block], since the OCaml
+       runtime already resurrected [heap_block] so that we could refer to it here. The
+       OCaml runtime already removed the finalizer function when it noticed [heap_block]
+       could be finalized, so there is no infinite loop in which we are causing the
+       finalizer to run again. Also, OCaml does not impose any requirement on finalizer
+       functions that they need to dispose of the block, so it's fine that we keep
+       [heap_block] around until later. *)
+    if not t.reset_in_forked_process
+    then (
+      if Debug.finalizers then Debug.log_string "enqueueing finalizer";
+      thread_safe_enqueue_external_job
+        t
+        execution_context
+        (fun { aliased } -> f aliased)
+        { aliased = heap_block })
+  in
+  if Debug.finalizers then Debug.log_string "adding finalizer";
+  let finalizer =
+    Core.Gc.Expert.With_leak_protection.protect_finalizer heap_block (fun heap_block ->
+      finalizer { aliased = heap_block })
+  in
+  (* We use [Caml.Gc.finalise] instead of [Core.Gc.add_finalizer] because the latter has
+     its own wrapper around [Caml.Gc.finalise] to run finalizers synchronously. *)
+  try Stdlib.Gc.finalise finalizer heap_block with
+  | Invalid_argument _ ->
+    (* [Heap_block] ensures that this will only fail for static data, in which case we can
+       drop the finalizer since the block will never be collected. *)
+    ()
+;;
+
+let add_finalizer_exn t x f =
+  add_finalizer t (Heap_block.create_exn x) (fun heap_block ->
+    f (Heap_block.value heap_block))
+;;
+
+let add_finalizer_last t heap_block f =
+  let execution_context = current_execution_context t in
+  let finalizer () =
+    (* Here we can be in any thread, and may not be holding the async lock. So, we can
+       only do thread-safe things. *)
+    if not t.reset_in_forked_process
+    then (
+      if Debug.finalizers
+      then Debug.log_string "enqueueing finalizer (using 'last' semantic)";
+      thread_safe_enqueue_external_job
+        t
+        execution_context
+        (fun { aliased = f } -> f ())
+        { aliased = f })
+  in
+  if Debug.finalizers then Debug.log_string "adding finalizer (using 'last' semantic)";
+  (* We use [Caml.Gc.finalise_last] instead of [Core.Gc.add_finalizer_last] because the
+     latter has its own wrapper around [Caml.Gc.finalise_last] to run finalizers
+     synchronously. *)
+  try Stdlib.Gc.finalise_last finalizer heap_block with
+  | Invalid_argument _ ->
+    (* [Heap_block] ensures that this will only fail for static data, in which case we can
+       drop the finalizer since the block will never be collected. *)
+    ()
+;;
+
+let add_finalizer_last_exn t x f = add_finalizer_last t (Heap_block.create_exn x) f
+
+(** [force_current_cycle_to_end] sets the number of normal jobs allowed to run in this
+    cycle to zero. Thus, after the currently running job completes, the scheduler will
+    switch to low priority jobs and then end the current cycle. *)
+let force_current_cycle_to_end t =
+  Job_queue.set_jobs_left_this_cycle t.normal_priority_jobs 0
+;;
+
+(* We preallocate [send_exn] to avoid allocating it on each call to [advance_clock]. *)
+let send_exn = Some Monitor.send_exn
+
+let advance_clock t ~now =
+  Synchronous_time_source0.advance_internal t.time_source ~to_:now ~send_exn
+;;
+
+let run_cycle t =
+  if debug then Debug.log "run_cycle starting" t [%sexp_of: t];
+  let now = Time_ns.now () in
+  t.cycle_count <- t.cycle_count + 1;
+  t.cycle_start <- now;
+  t.in_cycle <- true;
+  Job_infos_for_cycle.Private.on_cycle_start t.job_infos_for_cycle;
+  let old_context = current_execution_context t in
+  Bvar.broadcast t.yield ();
+  let num_jobs_run_at_start_of_cycle = num_jobs_run t in
+  Array.iter t.run_every_cycle_start ~f:(fun f -> f ());
+  advance_clock t ~now;
+  start_cycle t ~max_num_jobs_per_priority:t.max_num_jobs_per_priority_per_cycle;
+  let rec run_jobs t =
+    match Scheduler.run_jobs t with
+    | Ok () -> ()
+    | Error (exn, backtrace) ->
+      Monitor.send_exn (Monitor.current ()) exn ~backtrace:(`This backtrace);
+      (* [run_jobs] stopped due to an exn. There may still be jobs that could be run this
+         cycle, so [run_jobs] again. *)
+      run_jobs t
+  in
+  run_jobs t;
+  let cycle_time = Time_ns.diff (Time_ns.now ()) t.cycle_start in
+  t.last_cycle_time <- cycle_time;
+  t.last_cycle_num_jobs <- num_jobs_run t - num_jobs_run_at_start_of_cycle;
+  t.total_cycle_time <- Time_ns.Span.(t.total_cycle_time + cycle_time);
+  if Bvar.has_any_waiters t.yield_until_no_jobs_remain && num_pending_jobs t = 0
+  then Bvar.broadcast t.yield_until_no_jobs_remain ();
+  Array.iter t.run_every_cycle_end ~f:(fun f -> f ());
+  set_execution_context t old_context;
+  t.in_cycle <- false;
+  if debug
+  then
+    Debug.log
+      "run_cycle finished"
+      (uncaught_exn t, is_some (next_upcoming_event t))
+      [%sexp_of: Error.t option * bool]
+;;
+
+let run_cycles_until_no_jobs_remain () =
+  if debug then Debug.log_string "run_cycles_until_no_jobs_remain starting";
+  let t = t () in
+  if is_dead t
+  then
+    raise_s
+      [%message
+        "run_cycles_until_no_jobs_remain cannot proceed -- scheduler is dead"
+          ~scheduler:(t : t)];
+  let rec loop () =
+    run_cycle t;
+    advance_clock t ~now:(Time_ns.now ());
+    if can_run_a_job t then loop ()
+  in
+  loop ();
+  if debug then Debug.log_string "run_cycles_until_no_jobs_remain finished";
+  Option.iter (uncaught_exn t) ~f:Error.raise
+;;
+
+let make_async_unusable () =
+  let t = t_without_checking_access () in
+  t.check_access
+  <- Some
+       (fun () ->
+         raise_s [%sexp "Async scheduler is unusable due to [make_async_unusable]"])
+;;
+
+let reset_in_forked_process () =
+  (Capsule.Initial.Data.unwrap (Atomic.get t_ref)).reset_in_forked_process <- true;
+  if debug then Debug.log_string "reset_in_forked_process";
+  (* There is no need to empty [main_monitor_hole]. *)
+  let t = create () in
+  Atomic.set t_ref (Capsule.Initial.Data.wrap t)
+;;
+
+let check_invariants t = t.check_invariants
+let set_check_invariants t b = t.check_invariants <- b
+let recording_backtraces t = t.record_backtraces
+let set_record_backtraces t b = t.record_backtraces <- b
+let yield t = Bvar.wait t.yield
+
+let yield_until_no_jobs_remain ?(may_return_immediately = false) t =
+  if may_return_immediately && num_pending_jobs t = 0
+  then return ()
+  else Bvar.wait t.yield_until_no_jobs_remain
+;;
+
+let yield_every ~n =
+  if n <= 0
+  then raise_s [%message "Scheduler.yield_every got nonpositive count" (n : int)]
+  else if n = 1
+  then stage (fun t -> yield t)
+  else (
+    let count_until_yield = ref n in
+    stage (fun t ->
+      decr count_until_yield;
+      if !count_until_yield > 0
+      then return ()
+      else (
+        count_until_yield := n;
+        yield t)))
+;;
+
+let total_cycle_time t =
+  (* Adjust for the fact the caller's probably an Async job. *)
+  if t.in_cycle
+  then (
+    let this_cycle_time = Time_ns.(diff (now ()) t.cycle_start) in
+    Time_ns.Span.(t.total_cycle_time + this_cycle_time))
+  else t.total_cycle_time
+;;
+
+module Very_low_priority_work = struct
+  module Worker_result = Very_low_priority_worker.Exec_result
+
+  let rec run t = run_workers t ~num_execs_before_yielding:1_000
+
+  and run_workers t ~num_execs_before_yielding =
+    if num_execs_before_yielding = 0
+    then yield_then_run t
+    else if not (Deque.is_empty t.very_low_priority_workers)
+    then (
+      let worker = Deque.dequeue_front_exn t.very_low_priority_workers in
+      set_execution_context t worker.execution_context;
+      run_worker t worker ~num_execs_before_yielding)
+
+  and yield_then_run t =
+    if not (Deque.is_empty t.very_low_priority_workers)
+    then Deferred.upon (yield t) (fun () -> run t)
+
+  and run_worker t worker ~num_execs_before_yielding =
+    assert (phys_equal t.current_execution_context worker.execution_context);
+    if num_execs_before_yielding = 0
+    then (
+      Deque.enqueue_front t.very_low_priority_workers worker;
+      yield_then_run t)
+    else (
+      let num_execs_before_yielding = num_execs_before_yielding - 1 in
+      match worker.exec () with
+      | Finished -> run_workers t ~num_execs_before_yielding
+      | Not_finished -> run_worker t worker ~num_execs_before_yielding
+      | exception exn ->
+        let bt = Backtrace.Exn.most_recent () in
+        Monitor.send_exn (Monitor.current ()) exn ~backtrace:(`This bt);
+        run_workers t ~num_execs_before_yielding)
+  ;;
+
+  let enqueue ~f =
+    let t = t () in
+    let queue = t.very_low_priority_workers in
+    let running = not (Deque.is_empty queue) in
+    let execution_context =
+      Execution_context.create_like (current_execution_context t) ~priority:Low
+    in
+    Deque.enqueue_back queue { execution_context; exec = f };
+    if not running then enqueue t execution_context run t
+  ;;
+end
+
+module For_bench = struct
+  let advance_clock = advance_clock
+end
+
+let in_cycle t = t.in_cycle
