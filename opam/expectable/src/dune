@@ -1,0 +1,6 @@
+(library
+ (name expectable)
+ (public_name expectable)
+ (libraries textutils.ascii_table_kernel base.composition_infix core)
+ (preprocess
+  (pps ppx_jane)))

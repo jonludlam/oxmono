@@ -1,0 +1,3 @@
+(alias
+ (name mdx-deps)
+ (deps test/readme.ml))
