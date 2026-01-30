@@ -1,0 +1,9 @@
+(executables
+ (modes byte exe)
+ (names board_pin_info generator simulate)
+ (libraries core.command core_unix.command_unix core hardcaml
+   hardcaml_hobby_boards_demos_arty_a7_35t
+   hardcaml_hobby_boards_demos_nexys_a7_100t hardcaml_hobby_boards_kernel
+   hardcaml_hobby_boards_test hardcaml_waveterm.interactive jane_rope)
+ (preprocess
+  (pps ppx_jane)))

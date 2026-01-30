@@ -1,0 +1,32 @@
+opam-version: "2.0"
+maintainer: "Jane Street developers"
+authors: ["Jane Street Group, LLC"]
+homepage: "https://github.com/janestreet/hardcaml_hobby_boards_kernel"
+bug-reports: "https://github.com/janestreet/hardcaml_hobby_boards_kernel/issues"
+dev-repo: "git+https://github.com/janestreet/hardcaml_hobby_boards_kernel.git"
+doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/hardcaml_hobby_boards_kernel/index.html"
+license: "MIT"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "base"
+  "core"
+  "core_unix"
+  "hardcaml"
+  "hardcaml_axi"
+  "jane_rope"
+  "parsexp"
+  "ppx_hardcaml"
+  "ppx_jane"
+  "ppx_rope"
+  "simple_xml"
+  "stdio"
+  "dune"         {>= "3.17.0"}
+]
+available: arch != "arm32" & arch != "x86_32"
+synopsis: "Support code for FPGA hobby boards."
+description: "
+Interface code for FPGA hobby boards, useful library infrastructure, and build script generation.
+"
