@@ -1,0 +1,6 @@
+(library
+ (name uri_parsing_test)
+ (libraries base64 base_quickcheck core expect_test_helpers_core
+   patdiff.expect_test_patdiff uri uri_jane uri_parsing)
+ (preprocess
+  (pps ppx_jane ppx_quick_test)))

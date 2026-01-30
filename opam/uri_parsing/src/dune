@@ -1,0 +1,8 @@
+(library
+ (name uri_parsing)
+ (public_name uri_parsing)
+ (libraries textutils.ascii_table_kernel base64 core re
+   ppx_typed_fields.typed_field_map ppx_typed_fields.typed_fields_lib
+   ppx_typed_fields.typed_variants_lib uri)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx)))
