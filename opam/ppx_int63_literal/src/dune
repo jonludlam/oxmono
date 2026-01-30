@@ -1,0 +1,7 @@
+(library
+ (public_name ppx_int63_literal)
+ (name ppx_int63_literal)
+ (kind ppx_rewriter)
+ (libraries base ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
