@@ -1,0 +1,8 @@
+(library
+ (name enumerate_sample)
+ (preprocess
+  (pps ppx_jane)))
+
+(alias
+ (name default)
+ (deps test.ml.pp))
