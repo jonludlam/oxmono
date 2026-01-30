@@ -1,0 +1,8 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names bigstring_io_stubs))
+ (name shexp_bigstring_io)
+ (public_name shexp.bigstring-io)
+ (libraries shexp_bigstring unix)
+ (preprocess no_preprocessing))
