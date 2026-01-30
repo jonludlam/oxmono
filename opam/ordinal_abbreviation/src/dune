@@ -1,0 +1,6 @@
+(library
+ (name ordinal_abbreviation)
+ (public_name ordinal_abbreviation)
+ (libraries base)
+ (preprocess
+  (pps ppx_jane)))
