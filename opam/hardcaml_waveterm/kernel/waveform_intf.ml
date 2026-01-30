@@ -1,0 +1,100 @@
+(** A waveform is a mutable value that represents the outcome of a simulation; it holds a
+    time series of values for a number of ports. The waveform is updated by running the
+    simulation. *)
+
+open Base
+open! Hardcaml
+
+module type S = sig
+  module Data : Data.S
+  module Wave : Wave.M(Data).S
+  module Waves : Waves.M(Data)(Wave).S
+  module Render : Render.M(Data)(Wave)(Waves).S
+
+  type t [@@deriving sexp_of, equal ~localize]
+
+  val create_from_data : waves:Wave.t list -> ports:Port.t list -> t
+  val waves : t -> Wave.t array
+  val update_waves : t -> Wave.t array -> t
+
+  (** Combine two waveforms into one waveform *)
+  val combine : t -> t -> t
+
+  (** Waveform configuration options.
+
+      [display_rules] see [Display_rules]. A waveform may be constructed once and
+      displayed multiple times with differing options.
+
+      [wave_width] sets the number of chars used to render each clock cycle.
+
+      - [n>=0] ((n+1)*2) characters per cycle. This ensures that the clock is properly
+        rendered when [n=0]. The default of [3] allows up to 7 chars per cycle to be
+        rendered to represent data values in the waveform.
+
+      - [n<0] (-n) cycles per character. Characters in the waveform within which multiple
+        transitions occur are displayed with a double veritical bar.
+
+      [display_width] and [display_height] set the overall size of the displayed waveform.
+      An auto scaling routine assigns approximately [1/3] of the display for the signals
+      and values windows. The default size is 70 characters wide with the height
+      automatically inferred (upto a max of 256). The minimum size is 7 characters wide
+      and 3 high and an exception is raised otherwise.
+
+      [signals_alignment] changes the text alignment of the displayed signals names. By
+      default this is Wave_format.Left. *)
+  type 'a with_options =
+    ?display_rules:Display_rules.t
+    -> ?display_width:int
+    -> ?display_height:int
+    -> ?display_values:bool
+    -> ?wave_width:int
+    -> ?signals_width:int
+    -> ?start_cycle:int
+    -> ?signals_alignment:Text_alignment.t
+    -> 'a
+
+  val sort_ports_and_formats : t -> Display_rules.t option -> Wave.t array
+
+  (** Write waveform into a [Buffer.t]. *)
+  val to_buffer : (t -> Buffer.t) with_options
+
+  (** Convert waveform to a string. *)
+  val to_string : (t -> string) with_options
+
+  (** Print waveform to [channel] *)
+  val print
+    : (?channel:Stdio.Out_channel.t (** default is [stdout] *) -> t -> unit) with_options
+
+  (** General function to look up the nth cycle where the set of conditions given are met. *)
+  val look_for_nth_instance_of_condition_in_waveform
+    :  n:int
+    -> conditions:Wave_condition.t list
+    -> t
+    -> int option
+end
+
+module M
+    (Data : Data.S)
+    (Wave : Wave.M(Data).S)
+    (Waves : Waves.M(Data)(Wave).S)
+    (Render : Render.M(Data)(Wave)(Waves).S) =
+struct
+  module type S =
+    S
+    with module Data := Data
+     and module Wave := Wave
+     and module Waves := Waves
+     and module Render := Render
+end
+
+module type Waveform = sig
+  module type S = S
+
+  module M = M
+
+  module Make
+      (Data : Data.S)
+      (Wave : Wave.M(Data).S)
+      (Waves : Waves.M(Data)(Wave).S)
+      (Render : Render.M(Data)(Wave)(Waves).S) : M(Data)(Wave)(Waves)(Render).S
+end
