@@ -1,0 +1,7 @@
+(library
+ (name codicons)
+ (public_name codicons)
+ (preprocess
+  (pps ppx_jane))
+ (libraries bonsai_web_components.byo_icon core virtual_dom.css_gen
+   virtual_dom))
