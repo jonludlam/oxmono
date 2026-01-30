@@ -1,0 +1,5 @@
+(library
+ (name ppx_fuelproof_test)
+ (libraries base)
+ (preprocess
+  (pps ppx_jane ppx_fuelproof)))

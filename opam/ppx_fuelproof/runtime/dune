@@ -1,0 +1,5 @@
+(library
+ (name ppx_fuelproof_runtime)
+ (public_name ppx_fuelproof.runtime)
+ (libraries base)
+ (preprocess no_preprocessing))

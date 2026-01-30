@@ -1,0 +1,169 @@
+
+Error on unsupported kind annotation:
+
+```ocaml
+type%fuelproof 'a t : value mod portable with 'a =
+  { x : 'a }
+```
+```mdx-error
+Line 1, characters 23-49:
+Error: Unsupported kind annotation for %fuelproof
+```
+
+Error on claiming thing with mutable fields crosses contention:
+
+```ocaml
+type%fuelproof t : value mod contended =
+  { mutable x : int }
+```
+```mdx-error
+Line 2, characters 7-22:
+Error: Type with a mutable field can't cross contention
+```
+
+Error on claiming thing with mutable, atomic, non-contention-crossing
+field crosses contention:
+
+```ocaml
+type%fuelproof t : value mod contended =
+  { mutable x : int ref [@atomic] }
+```
+```mdx-error
+Line 2, characters 19-26:
+Error: Bad layout annotation:
+         The kind of int ref is mutable_data.
+         But the kind of int ref must be a subkind of any mod contended
+           because of the annotation on the wildcard _ at line 2, characters 19-26.
+```
+
+Error on type without kind annotation:
+
+```ocaml
+type%fuelproof t =
+  { mutable x : int }
+```
+```mdx-error
+Lines 1-2, characters 1-24:
+Error: %fuelproof can only be written on types with kind annotations
+```
+
+Error on unsupported axis:
+
+```ocaml
+type%fuelproof t : value mod shared =
+  { mutable x : int }
+```
+```mdx-error
+Line 1, characters 30-36:
+Error: Modifier not supported by fuelproof: shared
+```
+
+`ppx_fuelproof` raises an error if it would cause existential variables to have more
+restrictive mode crossing behavior inferred for them.
+
+```ocaml
+type%fuelproof t : value mod portable =
+  | A : _        -> t
+  | B : _ list   -> t
+  | C : _ iarray -> t
+```
+```mdx-error
+Lines 1-4, characters 1-24:
+Error: This variant or record definition does not match that of type
+         Check__002_.t
+       1. Constructors do not match:
+         A : ('a : value mod portable). 'a -> Check__002_.t
+       is not the same as:
+         A : 'a -> Check__002_.t
+       The type ('a : value mod portable) is not equal to the type
+         ('b : value)
+       because the layouts of their variables are different.
+       The layout of 'a is value mod portable
+         because of the definition of t at lines 1-4, characters 1-24.
+       The layout of 'b is value
+         because of the definition of t at lines 1-4, characters 1-24.
+       2. Constructors do not match:
+         B : ('a : value mod portable).
+           'a Ppx_fuelproof_runtime.list -> Check__002_.t
+       is not the same as:
+         B : 'a list -> Check__002_.t
+       The type 'a list is not equal to the type 'b list
+       because the layouts of their variables are different.
+       The layout of 'a is value mod portable
+         because of the definition of t at lines 1-4, characters 1-24.
+       The layout of 'b is value
+         because of the definition of t at lines 1-4, characters 1-24.
+       3. Constructors do not match:
+         C : ('a : value mod portable).
+           'a Ppx_fuelproof_runtime.Iarray.t -> Check__002_.t
+       is not the same as:
+         C : 'a iarray -> Check__002_.t
+       The type 'a iarray is not equal to the type 'b iarray
+       because the layouts of their variables are different.
+       The layout of 'a is value mod portable
+         because of the definition of t at lines 1-4, characters 1-24.
+       The layout of 'b is value
+         because of the definition of t at lines 1-4, characters 1-24.
+```
+
+You can explicitly quantify the variables to help:
+
+```ocaml
+type%fuelproof t : value mod portable =
+  | A : ('a : value mod portable). 'a -> t
+  | B : ('a : value mod portable). 'a list   -> t
+  | C : ('a : value mod portable). 'a iarray -> t
+```
+
+Errors on missing kind annotations on `[@@unboxed]` types:
+
+```ocaml
+type%fuelproof t = { inner : string * int } [@@unboxed]
+```
+```mdx-error
+Line 1, characters 1-56:
+Error: %fuelproof can only be written on types with kind annotations
+```
+
+Errors on claiming that a float isn't:
+
+```ocaml
+type%fuelproof t : immutable_data = { x : float } [@@unboxed]
+```
+```mdx-error
+Line 1, characters 43-48:
+Error: Bad layout annotation:
+         The kind of float is
+             value mod forkable unyielding many stateless immutable
+           because it is the primitive type float.
+         But the kind of float must be a subkind of
+             any mod forkable unyielding many stateless immutable non_float
+           because of the annotation on the wildcard _ at line 1, characters 43-48.
+```
+
+Errors on trying to use a nonstandard type alias like `list`:
+
+```ocaml
+  module Bad = struct
+    type ('a : value mod portable) list : value mod contended
+
+    type%fuelproof t : value mod portable =
+      | A : ('a : value mod portable). 'a list -> t
+  end
+```
+```mdx-error
+Lines 4-5, characters 7-54:
+Error: This variant or record definition does not match that of type
+         Check__005_.t
+       Constructors do not match:
+         A : ('a : value mod portable).
+           'a Ppx_fuelproof_runtime.list -> Check__005_.t
+       is not the same as:
+         A : ('a : value mod portable). 'a list -> Check__005_.t
+       The type 'a list/2 is not equal to the type 'a0 list/1
+       File "_none_", line 1:
+         Definition of type list/2
+       Hint: The type list has been defined multiple times in this toplevel
+         session. Some toplevel values still refer to old versions of this
+         type. Did you try to redefine them?
+```
