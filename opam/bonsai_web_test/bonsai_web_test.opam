@@ -1,0 +1,57 @@
+opam-version: "2.0"
+maintainer: "Jane Street developers"
+authors: ["Jane Street Group, LLC"]
+homepage: "https://github.com/janestreet/bonsai_web_test"
+bug-reports: "https://github.com/janestreet/bonsai_web_test/issues"
+dev-repo: "git+https://github.com/janestreet/bonsai_web_test.git"
+doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/bonsai_web_test/index.html"
+license: "MIT"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "am_running_how_js"
+  "async_durable"
+  "async_js"
+  "async_kernel"
+  "async_rpc_kernel"
+  "babel"
+  "base"
+  "bonsai"
+  "bonsai_concrete"
+  "bonsai_test"
+  "bonsai_web"
+  "core"
+  "expect_test_helpers_core"
+  "expectable"
+  "incr_map"
+  "incremental"
+  "legacy_diffable"
+  "ocaml-embed-file"
+  "patdiff"
+  "polling_state_rpc"
+  "ppx_css"
+  "ppx_diff"
+  "ppx_expect"
+  "ppx_html"
+  "ppx_jane"
+  "ppx_pattern_bind"
+  "streamable"
+  "textutils"
+  "toplayer"
+  "versioned_polling_state_rpc"
+  "virtual_dom"
+  "dune"                        {>= "3.17.0"}
+  "js_of_ocaml"                 {= "6.0.1+ox"}
+  "js_of_ocaml-ppx"             {= "6.0.1+ox"}
+  "lambdasoup"                  {>= "0.6.3"}
+  "re"                          {= "1.14.0+ox"}
+]
+available: arch != "arm32" & arch != "x86_32"
+synopsis: "A library for testing dynamic bonsai webapps, using Js_of_ocaml"
+description: "
+Bonsai is a library for building reusable UI components inside an
+     Incremental-style UI framework such as Incr_dom or React. This library provides
+     testing capabilities.
+"
