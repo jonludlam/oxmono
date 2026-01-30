@@ -9,6 +9,12 @@
 
 type 'a fmt = Format.formatter -> 'a -> unit
 
+(* Local result syntax for binding operators *)
+module Result_syntax = struct
+  let ( let* ) = Result.bind
+  let ( let+ ) r f = Result.map f r
+end
+
 module Sort = struct
   type t =
     | String
@@ -224,7 +230,7 @@ module Datetime = struct
   let pp fmt dt = Format.pp_print_string fmt (to_string dt)
 
   let of_string s =
-    let open Result.Syntax in
+    let open Result_syntax in
     match find_datetime_sep s with
     | None -> Error "missing date/time separator"
     | Some idx ->
@@ -265,7 +271,7 @@ module Datetime_local = struct
   let pp fmt dt = Format.pp_print_string fmt (to_string dt)
 
   let of_string s =
-    let open Result.Syntax in
+    let open Result_syntax in
     match find_datetime_sep s with
     | None -> Error "missing date/time separator"
     | Some idx ->
