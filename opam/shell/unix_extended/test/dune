@@ -1,0 +1,5 @@
+(library
+ (name unix_extended_test)
+ (libraries core expect_test_helpers_core unix_extended)
+ (preprocess
+  (pps ppx_jane)))
