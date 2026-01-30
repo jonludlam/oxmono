@@ -1,0 +1,4 @@
+(library
+ (name portable_common)
+ (public_name portable.common)
+ (preprocess no_preprocessing))

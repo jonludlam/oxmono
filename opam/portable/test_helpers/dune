@@ -1,0 +1,5 @@
+(library
+ (name portable_test_helpers)
+ (public_name portable.test_helpers)
+ (libraries base basement portable)
+ (preprocess no_preprocessing))
