@@ -1,0 +1,10 @@
+(executables
+ (modes byte exe)
+ (names test)
+ (libraries)
+ (preprocess
+  (pps ppxlib ppx_fields_conv)))
+
+(alias
+ (name default)
+ (deps test.ml.pp test.mli.pp))
