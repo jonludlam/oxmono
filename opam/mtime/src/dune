@@ -1,0 +1,15 @@
+(library
+ (name mtime)
+ (public_name mtime)
+ (modules mtime)
+ (wrapped false))
+
+(library
+ (name mtime_clock_virtual)
+ (public_name mtime.clock)
+ (modules))
+
+(install
+ (package mtime)
+ (section lib)
+ (files mtime_top_init.ml))

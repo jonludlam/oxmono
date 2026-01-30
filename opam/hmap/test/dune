@@ -1,0 +1,8 @@
+(executable
+ (name test)
+ (modules test)
+ (libraries hmap))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))

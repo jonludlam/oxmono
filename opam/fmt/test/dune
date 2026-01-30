@@ -1,0 +1,11 @@
+(executable
+ (name test_fmt)
+ (modules test_fmt)
+ (optional)
+ (libraries fmt b0.testing))
+
+(rule
+ (alias runtest)
+ (deps test_fmt.exe)
+ (enabled_if %{bin-available:test_fmt.exe})
+ (action (run ./test_fmt.exe)))

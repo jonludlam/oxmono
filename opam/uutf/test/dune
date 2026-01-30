@@ -1,0 +1,19 @@
+(executable
+ (name utftrip)
+ (modules utftrip)
+ (optional)
+ (libraries uutf unix cmdliner))
+
+(executable
+ (name test_uutf)
+ (modules test_uutf)
+ (libraries uutf))
+
+(rule
+ (alias runtest)
+ (action (run ./test_uutf.exe)))
+
+(executable
+ (name examples)
+ (modules examples)
+ (libraries uutf unix))

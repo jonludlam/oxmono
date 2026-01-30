@@ -1,0 +1,17 @@
+(executable
+ (name test)
+ (modules test testing test_char test_string test_sub total)
+ (libraries astring))
+
+(rule
+ (alias runtest)
+ (action (run ./test.exe)))
+
+(executable
+ (name examples)
+ (modules examples)
+ (libraries astring))
+
+(rule
+ (alias runtest)
+ (action (run ./examples.exe)))

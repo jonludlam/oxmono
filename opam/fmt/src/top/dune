@@ -1,0 +1,11 @@
+(library
+ (name fmt_top)
+ (public_name fmt.top)
+ (libraries compiler-libs.toplevel fmt fmt.tty)
+ (modules fmt_top)
+ (wrapped false))
+
+(install
+ (package fmt)
+ (section lib)
+ (files fmt_tty_top_init.ml))

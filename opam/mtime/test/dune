@@ -1,0 +1,22 @@
+(executable
+ (name test_mtime)
+ (modules test_mtime)
+ (optional)
+ (libraries mtime b0.testing))
+
+(executable
+ (name test_mtime_clock)
+ (modules test_mtime_clock)
+ (optional)
+ (libraries mtime mtime.clock.os b0.testing))
+
+; Tests disabled - require b0 library which is not available
+; (rule
+;  (alias runtest)
+;  (deps test_mtime.exe)
+;  (action (run ./test_mtime.exe)))
+
+; (rule
+;  (alias runtest)
+;  (deps test_mtime_clock.exe)
+;  (action (run ./test_mtime_clock.exe)))
