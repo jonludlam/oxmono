@@ -1,0 +1,5 @@
+(library
+ (name ppx_quickcheck_test_examples)
+ (libraries base base_quickcheck)
+ (preprocess
+  (pps ppx_quickcheck)))
