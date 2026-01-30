@@ -1,0 +1,14 @@
+(executables
+ (modes byte exe)
+ (names test)
+ (libraries hardcaml hardcaml_of_verilog parsexp)
+ (preprocess
+  (pps ppx_hardcaml ppx_jane)))
+
+(rule
+ (targets picorv32.ml)
+ (deps picorv32.v %{workspace_root}/lib/hardcaml/of_verilog/bin/convert.exe
+   picorv32.sexp)
+ (action
+  (bash
+    "%{workspace_root}/lib/hardcaml/of_verilog/bin/convert.exe synthesize ocaml-module -i picorv32.sexp -o picorv32.ml")))
