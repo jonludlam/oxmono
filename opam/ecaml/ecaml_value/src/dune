@@ -1,0 +1,12 @@
+(library
+ (foreign_stubs
+  (language c)
+  (names ecaml_stubs))
+ (name ecaml_value)
+ (public_name ecaml.ecaml_value)
+ (c_library_flags -std=c11)
+ (library_flags -linkall)
+ (libraries async_kernel async_unix core core_kernel.enum nested_profile
+   sexplib core_kernel.univ uutf)
+ (preprocess
+  (pps ppx_jane)))
