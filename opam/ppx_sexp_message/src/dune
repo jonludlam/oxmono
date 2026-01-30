@@ -1,0 +1,7 @@
+(library
+ (name ppx_sexp_message)
+ (public_name ppx_sexp_message)
+ (kind ppx_rewriter)
+ (libraries base ppx_sexp_message_expander ppxlib)
+ (preprocess
+  (pps ppxlib.metaquot)))
