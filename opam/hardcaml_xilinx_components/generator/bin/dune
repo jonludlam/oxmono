@@ -1,0 +1,7 @@
+(executables
+ (modes byte exe)
+ (names generator)
+ (public_names hardcaml_xilinx_components)
+ (libraries core_unix.command_unix core stdio xilinx_vhdl_generator)
+ (preprocess
+  (pps ppx_jane)))
