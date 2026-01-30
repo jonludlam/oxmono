@@ -1,0 +1,5 @@
+(library
+ (name testable_timeout_test_js)
+ (libraries async_js async_js.async_test async_kernel core testable_timeout)
+ (preprocess
+  (pps ppx_jane)))

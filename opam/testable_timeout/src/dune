@@ -1,0 +1,6 @@
+(library
+ (name testable_timeout)
+ (public_name testable_timeout)
+ (preprocess
+  (pps js_of_ocaml-ppx ppx_jane))
+ (libraries async_kernel core))
