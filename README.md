@@ -20,6 +20,15 @@ The majority of repos are hidden behind a `(vendored_dirs)` directive which
 means that they will only be compiled if there is a dependency on them from a
 package in the workspace.
 
+To setup a devcontainer:
+
+```
+# initial setup or update
+npx @devcontainers/cli up --workspace-folder . --remove-existing-container
+# get a shell
+npx @devcontainers/cli exec --workspace-folder . bash -l
+```
+
 ## Custom Code
 
 I'm sticking my own oxcaml code into `avsm/` to leave room for other users
