@@ -1,0 +1,5 @@
+(library
+ (name sexp_grammar_type)
+ (public_name sexp_type.grammar)
+ (libraries basement sexp_type)
+ (preprocess no_preprocessing))
