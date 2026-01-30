@@ -1,0 +1,6 @@
+(library
+ (name bonsai_term_spinner)
+ (public_name bonsai_term_components.spinner)
+ (libraries bonsai_term bonsai_term_compatibility core)
+ (preprocess
+  (pps ppx_jane bonsai.ppx_bonsai)))

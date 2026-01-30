@@ -1,0 +1,6 @@
+(library
+ (name zed)
+ (public_name bonsai_term_components.zed)
+ (libraries core react sexplib)
+ (preprocess
+  (pps ppx_jane)))

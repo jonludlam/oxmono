@@ -1,0 +1,6 @@
+(library
+ (name bonsai_tui_typography)
+ (public_name bonsai_term_components.typography)
+ (libraries bonsai_term core notty-community vec)
+ (preprocess
+  (pps ppx_jane)))
