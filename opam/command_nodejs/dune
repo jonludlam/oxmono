@@ -1,0 +1,17 @@
+(library
+ (name command_nodejs)
+ (public_name command_nodejs)
+ (libraries core js_of_ocaml core_kernel.version_util_compat)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx)))
+
+(rule
+ (targets mli.diff-for-review)
+ (deps ../../command_unix/src/command_unix.mli ./command_nodejs.mli)
+ (action
+  (bash
+    "( %{bin:patdiff-for-review} %{bin:patdiff} ../../command_unix/src/command_unix.mli ./command_nodejs.mli || true ) > %{targets}")))
+
+(alias
+ (name default)
+ (deps ./mli.diff-for-review))
