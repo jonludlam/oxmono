@@ -1,0 +1,187 @@
+open! Core
+open! Async_kernel
+open! Bonsai_web
+open! Bonsai_web_test
+open Bonsai.Let_syntax
+open Async_rpc_kernel
+
+(* $MDX part-begin=protocol-1 *)
+let double_rpc =
+  Rpc.Rpc.create
+    ~name:"double"
+    ~version:0
+    ~bin_query:[%bin_type_class: int]
+    ~bin_response:[%bin_type_class: int]
+    ~include_in_error_count:Only_on_exn
+;;
+
+(* $MDX part-end *)
+
+(* $MDX part-begin=protocol-2 *)
+module Current_time = struct
+  include String
+
+  module Diffable =
+    Diffable_polling_state_rpc_response.Polling_state_rpc_response.Make (String)
+end
+
+let current_time_rpc =
+  Polling_state_rpc.create
+    ~name:"current_time"
+    ~version:0
+    ~query_equal:[%equal: string]
+    ~bin_query:[%bin_type_class: string]
+    (module Current_time.Diffable)
+;;
+
+(* $MDX part-end *)
+
+(* $MDX part-begin=implementation-1 *)
+let double_implementation =
+  Rpc.Rpc.implement' double_rpc (fun _connection_state query -> Int.max 1 (query * 2))
+;;
+
+(* $MDX part-end *)
+
+(* $MDX part-begin=implementation-2 *)
+let current_time_implementation =
+  Polling_state_rpc.implement
+    ~on_client_and_server_out_of_sync:print_s
+    current_time_rpc
+    (fun _connection_state zone ->
+       Deferred.return
+         (Time_ns.to_sec_string ~zone:(Timezone.of_string zone) (Time_ns.now ())))
+  |> Rpc.Implementation.lift ~f:(fun connection_state ->
+    connection_state, connection_state)
+;;
+
+(* $MDX part-end *)
+
+module Custom_connection = Rpc_effect.Where_to_connect.Register ()
+
+(* Below is some sleight-of-hand. We want the readers of the guide to think that we are
+   using [Self], but we don't *actually* want to do that, since it would require having a
+   server to connect to. Thus, we shadow the text we want to display with the value we
+   want use. *)
+
+(* $MDX part-begin=where_to_connect *)
+let where_to_connect : Rpc_effect.Where_to_connect.t =
+  Rpc_effect.Where_to_connect.self ~on_conn_failure:Retry_until_success ()
+;;
+
+(* $MDX part-end *)
+
+let () = ignore (where_to_connect : Rpc_effect.Where_to_connect.t)
+
+let where_to_connect : Rpc_effect.Where_to_connect.t Bonsai.t =
+  Bonsai.return Custom_connection.where_to_connect
+;;
+
+let connector =
+  Rpc_effect.Connector.for_test
+    (Rpc.Implementations.create_exn
+       ~implementations:[ double_implementation; current_time_implementation ]
+       ~on_unknown_rpc:`Raise
+       ~on_exception:Log_on_background_exn)
+    ~connection_state:Fn.id
+;;
+
+let custom_connector = function
+  | Custom_connection.T -> connector
+  | _ -> Rpc_effect.Connector.test_fallback
+;;
+
+(* $MDX part-begin=client-1 *)
+let double_number_app (local_ graph) =
+  let dispatch_double_rpc =
+    Rpc_effect.Rpc.dispatcher double_rpc ~where_to_connect graph
+  in
+  let number, set_number = Bonsai.state 1 graph in
+  let%arr dispatch_double_rpc and number and set_number in
+  Vdom.Node.div
+    [ Vdom.Node.div [ Vdom.Node.text [%string "The number is: %{number#Int}"] ]
+    ; Vdom.Node.button
+        ~attrs:
+          [ Vdom.Attr.on_click (fun _ ->
+              match%bind.Effect dispatch_double_rpc number with
+              | Ok doubled_number -> set_number doubled_number
+              | Error error -> Effect.of_sync_fun eprint_s [%sexp (error : Error.t)])
+          ]
+        [ Vdom.Node.text "Double the number" ]
+    ]
+;;
+
+(* $MDX part-end *)
+
+module Css =
+  [%css
+  stylesheet
+    {|
+      .error_text {
+        color: red;
+      }
+    |}]
+
+let zone_form (local_ graph) =
+  let module Form = Bonsai_web_ui_form.With_automatic_view in
+  let form =
+    Form.Elements.Textbox.string
+      ~placeholder:(Bonsai.return "timezone")
+      ~allow_updates_when_focused:`Always
+      ()
+      graph
+  in
+  let form = Form.Dynamic.with_default (Bonsai.return "America/New_York") form graph in
+  let value =
+    let%arr form in
+    Form.value_or_default ~default:"America/New_York" form
+  in
+  let view =
+    let%arr form in
+    Form.view_as_vdom form
+  in
+  value, view
+;;
+
+(* $MDX part-begin=client-2 *)
+let current_time_app (local_ graph) =
+  let zone, zone_view = zone_form graph in
+  let response =
+    Rpc_effect.Polling_state_rpc.poll
+      current_time_rpc
+      ~equal_query:[%equal: string]
+      ~equal_response:[%equal: Current_time.t]
+      ~where_to_connect
+      ~every:(Bonsai.return (Time_ns.Span.of_sec 0.1))
+      ~output_type:Response_state_with_details
+      zone
+      graph
+  in
+  let%arr response and zone_view in
+  let response_view =
+    match response with
+    | No_response_yet -> Vdom.Node.div [ Vdom.Node.text "Loading..." ]
+    | Ok { query = zone; response = current_time; _ } ->
+      Vdom.Node.div
+        [ Vdom.Node.text
+            [%string "The current time in the zone '%{zone}' is %{current_time}"]
+        ]
+    | Error { query = zone; error; last_ok_response; _ } ->
+      let last_ok_view =
+        let%map.Option { query = zone; response = current_time; _ } = last_ok_response in
+        Vdom.Node.text
+          [%string
+            "Last successful request: the current time in the zone '%{zone}' is \
+             %{current_time}"]
+      in
+      Vdom.Node.div
+        ~attrs:[ Css.error_text ]
+        [ Vdom.Node.text [%string "Got error when requesting time in zone '%{zone}'"]
+        ; Option.value last_ok_view ~default:Vdom.Node.none
+        ; Vdom.Node.pre [ Vdom.Node.text (Error.to_string_hum error) ]
+        ]
+  in
+  Vdom.Node.div [ zone_view; response_view ]
+;;
+
+(* $MDX part-end *)
