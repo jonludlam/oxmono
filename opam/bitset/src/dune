@@ -1,0 +1,12 @@
+(library
+ (public_name bitset)
+ (name bitset)
+ (libraries core ocaml_intrinsics_kernel unboxed)
+ (preprocess
+  (pps ppx_jane)))
+
+(rule
+ (targets ocamlopt-flags)
+ (deps)
+ (action
+  (bash "echo '(-O3 -flambda2-inline-max-depth 10)' > ocamlopt-flags")))
