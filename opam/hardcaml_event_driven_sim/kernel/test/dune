@@ -1,0 +1,5 @@
+(library
+ (name event_driven_sim_test)
+ (libraries core event_driven_sim)
+ (preprocess
+  (pps ppx_jane)))
