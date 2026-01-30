@@ -1,0 +1,55 @@
+true : bin_annot, safe_string
+<_b0> : -traverse
+<src> : include
+
+<src/unix> : include
+<src/**> : package(unix)
+
+<src/blake3> : include
+<src/blake3/bytesrw_blake3_stubs.c> : use_libblake3
+<src/blake3/bytesrw_blake3.{cma,cmxa}> : record_bytesrw_blake3_stubs
+<src/blake3/bytesrw_blake3.{cmxs}> : link_bytesrw_blake3_stubs_archive
+<src/blake3/libbytesrw_blake3_stubs.*> : use_libblake3
+
+<src/crypto> : include
+<src/crypto/bytesrw_crypto_stubs.c> : use_tfpsacrypto
+<src/crypto/bytesrw_crypto.{cma,cmxa}> : record_bytesrw_crypto_stubs
+<src/crypto/bytesrw_crypto.{cmxs}> : link_bytesrw_crypto_stubs_archive
+<src/crypto/libbytesrw_crypto_stubs.*> : use_tfpsacrypto
+
+<src/md> : include
+<src/md/bytesrw_md_stubs.c> : use_libmd
+<src/md/bytesrw_md.{cma,cmxa}> : record_bytesrw_md_stubs
+<src/md/bytesrw_md.{cmxs}> : link_bytesrw_md_stubs_archive
+<src/md/libbytesrw_md_stubs.*> : use_libmd
+
+<src/sysrandom> : include
+<src/sysrandom/bytesrw_sysrandom.{cma,cmxa}> : record_bytesrw_sysrandom_stubs
+<src/sysrandom/bytesrw_sysrandom.{cmxs}> : link_bytesrw_sysrandom_stubs
+
+<src/tls> : include
+<src/tls/bytesrw_tls__mbedtls_stubs.c> : use_mbedtls
+<src/tls/bytesrw_tls.{cma,cmxa}> : record_bytesrw_tls_stubs
+<src/tls/bytesrw_tls.{cmxs}> : link_bytesrw_tls_stubs_archive
+<src/tls/libbytesrw_tls_stubs.*> : use_mbedtls
+
+<test/certown*> : package(unix,cmdliner,b0.std), use_bytesrw_crypto, use_bytesrw_tls
+
+
+<src/xxhash> : include
+<src/xxhash/bytesrw_xxhash_stubs.c> : use_libxxhash
+<src/xxhash/bytesrw_xxhash.{cma,cmxa}> : record_bytesrw_xxhash_stubs
+<src/xxhash/bytesrw_xxhash.{cmxs}> : link_bytesrw_xxhash_stubs_archive
+<src/xxhash/libbytesrw_xxhash_stubs.*> : use_libxxhash
+
+<src/zlib> : include
+<src/zlib/bytesrw_zlib_stubs.c> : use_zlib
+<src/zlib/bytesrw_zlib.{cma,cmxa}> : record_bytesrw_zlib_stubs
+<src/zlib/bytesrw_zlib.{cmxs}> : link_bytesrw_zlib_stubs_archive
+<src/zlib/libbytesrw_zlib_stubs.*> : use_zlib
+
+<src/zstd> : include
+<src/zstd/bytesrw_zstd_stubs.c> : use_libzstd
+<src/zstd/bytesrw_zstd.{cma,cmxa}> : record_bytesrw_zstd_stubs
+<src/zstd/bytesrw_zstd.{cmxs}> : link_bytesrw_zstd_stubs_archive
+<src/zstd/libbytesrw_zstd_stubs.*> : use_libzstd

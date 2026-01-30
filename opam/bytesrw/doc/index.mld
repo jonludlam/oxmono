@@ -1,0 +1,114 @@
+  {0 Bytesrw {%html: <span class="version">v0.3.0</span>%}}
+
+Bytesrw extends the OCaml {!Bytes} module with composable, memory
+efficient, byte stream {{!Bytesrw.Bytes.Reader}readers} and
+{{!Bytesrw.Bytes.Writer}writers} compatible with effect based
+concurrency.
+
+Except for byte slice {{!Bytesrw.Bytes.Slice.validity}life-times},
+these abstractions intentionally separate away ressource management
+and the specifics of reading and writing bytes.
+
+{1:manuals Manuals}
+
+The following manuals are available:
+
+{ul
+{- The {{!quick}quick start} should do so.}
+{- The {{!tutorial}tutorial} is a conceptual overview of byte stream readers
+   and writers.}
+{- The {{!cookbook}Bytesrw cookbook} has a few conventions and
+   byte stream recipes.}
+{- The {{!page-notes}design notes} explains design choices made by the
+   library.}}
+
+{1:bytesrw Library [bytesrw]}
+
+This library has the base definition of byte stream reader and writers as an
+extension of the {!Stdlib.Bytes} module.
+
+{!modules:
+Bytesrw}
+
+{!modules:
+Bytesrw.Bytes.Slice
+Bytesrw.Bytes.Stream
+Bytesrw.Bytes.Reader
+Bytesrw.Bytes.Writer}
+
+The following modules rely only on the [Stdlib]:
+
+{!modules:
+Bytesrw_utf
+Bytesrw_hex}
+
+{1:bytesrw_other_libs Libraries
+                      [bytesrw.{blake3,crypto,md,tls,unix,xxhash,zlib,zstd}]}
+
+Each of these modules lives in its corresponding library. Compression
+and hashing libraries depend on their canonical C library and
+encryption on Mbed TLS. If a library is missing, install the
+corresponding [conf] opam package and reinstall [bytesrw].
+
+{!modules:
+Bytesrw_blake3
+Bytesrw_crypto
+Bytesrw_md
+Bytesrw_sysrandom
+Bytesrw_tls
+Bytesrw_unix
+Bytesrw_xxhash
+Bytesrw_zlib
+Bytesrw_zstd
+}
+
+{1:quick Quick start}
+
+This example compresses standard input to standard output
+with [zstd] using either a compressing byte stream reader (pull) or a
+compressing byte stream writer (push).
+{[
+cat << 'EOF' > quickstart.ml
+open Bytesrw
+
+let stdio_compress_reads () =
+  try
+    let stdin = Bytes.Reader.of_in_channel In_channel.stdin in
+    let stdout = Bytes.Writer.of_out_channel Out_channel.stdout in
+    let params = Bytesrw_zstd.Cctx_params.make ~checksum:true () in
+    let zstdr = Bytesrw_zstd.compress_reads ~params () stdin in
+    Bytes.Writer.write_reader ~eod:true stdout zstdr;
+    Ok ()
+  with
+  | Bytes.Stream.Error e -> Bytes.Stream.error_to_result e
+  | Sys_error e -> Error e
+
+let stdio_compress_writes () =
+  try
+    let stdin = Bytes.Reader.of_in_channel In_channel.stdin in
+    let stdout = Bytes.Writer.of_out_channel Out_channel.stdout in
+    let params = Bytesrw_zstd.Cctx_params.make ~checksum:true () in
+    let zstdw = Bytesrw_zstd.compress_writes ~params () ~eod:true stdout in
+    Bytes.Writer.write_reader ~eod:true zstdw stdin;
+    Ok ()
+  with
+  | Bytes.Stream.Error e -> Bytes.Stream.error_to_result e
+  | Sys_error e -> Error e
+
+let main () =
+  Result.fold ~ok:(Fun.const 0) ~error:(fun e -> prerr_endline e; 1) @@
+  if Array.exists (String.equal "-w") Sys.argv
+  then stdio_compress_writes ()
+  else stdio_compress_reads ()
+
+let () = if !Sys.interactive then () else exit (main ())
+EOF
+]}
+It can be compiled and used with:
+{[
+ocamlfind ocamlopt -package bytesrw,bytesrw.zstd -linkpkg quickstart.ml
+./a.out < quickstart.ml | zstd -d
+]}
+The {{!page-tutorial}tutorial} is a short conceptual overview of byte stream
+readers and writers. The {{!page-cookbook}cookbook} has a few more tips and
+code snippets.

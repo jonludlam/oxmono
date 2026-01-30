@@ -1,0 +1,125 @@
+description = "Composable byte stream readers and writers for OCaml"
+version = "0.3.0"
+requires = ""
+archive(byte) = "bytesrw.cma"
+archive(native) = "bytesrw.cmxa"
+plugin(byte) = "bytesrw.cma"
+plugin(native) = "bytesrw.cmxs"
+exists_if = "bytesrw.cma bytesrw.cmxa"
+
+package "blake3" (
+  directory = "blake3"
+  description = "BLAKE3 hashes"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_blake3.cma"
+  archive(native) = "bytesrw_blake3.cmxa"
+  plugin(byte) = "bytesrw_blake3.cma"
+  plugin(native) = "bytesrw_blake3.cmxs"
+  exists_if = "bytesrw_blake3.cma bytesrw_blake3.cmxa"
+)
+
+package "crypto" (
+  directory = "crypto"
+  description = "Cryptographic primitives"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_crypto.cma"
+  archive(native) = "bytesrw_crypto.cmxa"
+  plugin(byte) = "bytesrw_crypto.cma"
+  plugin(native) = "bytesrw_crypto.cmxs"
+  exists_if = "bytesrw_crypto.cma bytesrw_crypto.cmxa"
+)
+
+package "md" (
+  directory = "md"
+  description = "SHA{1,2} hashes"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_md.cma"
+  archive(native) = "bytesrw_md.cmxa"
+  plugin(byte) = "bytesrw_md.cma"
+  plugin(native) = "bytesrw_md.cmxs"
+  exists_if = "bytesrw_md.cma bytesrw_md.cmxa"
+)
+
+package "sysrandom" (
+  directory = "sysrandom"
+  description = "Cryptographically secure pseudorandom byte streams"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_sysrandom.cma"
+  archive(native) = "bytesrw_sysrandom.cmxa"
+  plugin(byte) = "bytesrw_sysrandom.cma"
+  plugin(native) = "bytesrw_sysrandom.cmxs"
+  exists_if = "bytesrw_sysrandom.cma bytesrw_sysrandom.cmxa"
+)
+
+package "tls" (
+  directory = "tls"
+  description = "TLS streams"
+  version = "0.3.0"
+  requires = "bytesrw bytesrw.crypto unix"
+  exports = "bytesrw bytesrw.crypto unix"
+  archive(byte) = "bytesrw_tls.cma"
+  archive(native) = "bytesrw_tls.cmxa"
+  plugin(byte) = "bytesrw_tls.cma"
+  plugin(native) = "bytesrw_tls.cmxs"
+  exists_if = "bytesrw_tls.cma bytesrw_tls.cmxa"
+)
+
+package "unix" (
+  directory = "unix"
+  description = "The bytesrw.unix library"
+  version = "0.3.0"
+  requires = "bytesrw unix"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_unix.cma"
+  archive(native) = "bytesrw_unix.cmxa"
+  plugin(byte) = "bytesrw_unix.cma"
+  plugin(native) = "bytesrw_unix.cmxs"
+  exists_if = "bytesrw_unix.cma bytesrw_unix.cmxa"
+)
+
+package "xxhash" (
+  directory = "xxhash"
+  description = "XXH hashes"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_xxhash.cma"
+  archive(native) = "bytesrw_xxhash.cmxa"
+  plugin(byte) = "bytesrw_xxhash.cma"
+  plugin(native) = "bytesrw_xxhash.cmxs"
+  exists_if = "bytesrw_xxhash.cma bytesrw_xxhash.cmxa"
+)
+
+package "zlib" (
+  directory = "zlib"
+  description = "deflate, zlib and gzip streams"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_zlib.cma"
+  archive(native) = "bytesrw_zlib.cmxa"
+  plugin(byte) = "bytesrw_zlib.cma"
+  plugin(native) = "bytesrw_zlib.cmxs"
+  exists_if = "bytesrw_zlib.cma bytesrw_zlib.cmxa"
+)
+
+package "zstd" (
+  directory = "zstd"
+  description = "zstd streams"
+  version = "0.3.0"
+  requires = "bytesrw"
+  exports = "bytesrw"
+  archive(byte) = "bytesrw_zstd.cma"
+  archive(native) = "bytesrw_zstd.cmxa"
+  plugin(byte) = "bytesrw_zstd.cma"
+  plugin(native) = "bytesrw_zstd.cmxs"
+  exists_if = "bytesrw_zstd.cma bytesrw_zstd.cmxa"
+)

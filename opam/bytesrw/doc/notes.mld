@@ -1,0 +1,190 @@
+{0 Design notes}
+
+{1:wf Well formed streams}
+
+The design enforces well-formed streams: sequences of {e non-empty}
+slices terminated by a single {!Bytesrw.Bytes.Slice.eod} empty slice.
+
+We want to ensure that the [read] functions of streams readers do not
+return unexpected empty slices and that they are not called again once
+they returned {!Bytesrw.Bytes.Slice.eod}. Likewise we want to ensure
+that the [write] function of writers is not called with unexpected
+empty slices or that they are called again once they were called with
+{!Bytesrw.Bytes.Slice.eod}.
+
+For example the {!Bytesrw.Bytes.Slice} creation function like
+{!Bytesrw.Bytes.Slice.make} raise [Invalid_argument] when they
+unexpectedly produce an empty slice and those that can produce them
+have dedicated names that include [_eod]
+(e.g. {!Bytesrw.Bytes.Slice.make_or_eod}). This makes programmers
+well-aware of the points in the code that may terminate streams.
+
+Besides, readers and writers internally overwrite their [read] and [write]
+function as soon as {!Bytesrw.Bytes.Slice.eod} is seen so that no
+closure is kept longer than it should be.
+
+{1:errors Error strategy}
+
+The error strategy may look involved but it caters for:
+
+- Simple strategies like {!Bytesrw_zstd} where a single case is used
+  for all errors.
+- Complex strategies where a dedicated structured error type is used,
+  possibly distinguishing between setup/reader/writer errors
+
+while retaining the ability to pattern match on the error of specific
+streams and making sure informative human error messages can always be
+produced.
+
+For users it means that when they use streams:
+
+- There is a single exception to guard against and this exception can
+  trivially be turned into an error message.
+- Pattern matching on errors can still be used on a per stream format
+  basis. This is needed for example for stream fromats that deal with
+  substreams of other formats: since streams can be layered on top of
+  each other and a lower level stream could error while you are
+  dealing with your own format, that error should not be caught
+  (XXX but what about ambiguities ?, should we add auto generated
+  stream ids ?).
+
+To enforce good behaviour by stream reader and writers the following
+type structure is used:
+
+- There is an extensible {!Bytesrw.Bytes.Stream.type-error} types to
+  which stream formats add they own case.
+- The {!Bytesrw.Bytes.Stream.Error} exception which holds a value of type
+  [error] cannot be directly raised as it demands the creation of a
+  {!Bytesrw.Bytes.Stream.error_context} value for which there is no constructor.
+- This means that all raises go through either
+  {!Bytesrw.Bytes.Stream.val-error},
+  or {!Bytesrw.Bytes.Reader.val-error} or {!Bytesrw.Bytes.Writer.val-error}.
+  These functions ask for a {!Bytesrw.Bytes.Stream.format_error},
+  whose creation asks stream formats to identify themelves and describe
+  how their errors can be stringified.
+
+Effectively this system can be seen as an OCaml-like exception system
+inside the {!Bytesrw.Bytes.Stream.Error} exception.
+
+{1:primitives Signature of [read/write] primitives}
+
+- [write] has to write all the given bytes. Having [write] return the number
+  of written bytes from the slice would be useful for certain scenario, most
+  notably write filters. It would be the moral equivalent of readers' push
+  backs, except in this case it would be inconvenient {e for the client} and
+  leads to things like [really_write], not desirable.
+
+- [read] does not allow to specify the number bytes to read. Doing so would
+  entail storing the last slice in the reader. Then if too much bytes are
+  requested we either need to start buffering internally because of slice
+  validity or potentially return less. However the latter leads to
+  [really_read] and buffering again, not desirable. The
+  {{:https://github.com/dbuenzli/bytesrw/blob/main/test/utf8codec.ml}UTF-8
+  text codec} example shows that we can really get rid of buffering
+  except for a tiny buffer for overlapping reads. So it seems better to
+  let higher-level abstractions handle that if they really need to.
+
+{1:names Names}
+
+- We settle on [length]s rather than [size]s because that's what
+  the [Stdlib] generally uses.
+
+- We use [first], [last] and [length] for slice indexing and [pos],
+  for streams. That way the terminology does not overlap which makes
+  it for a clearer exposition. Incidentally our usage of [pos] is
+  consistent with the [Stdlib] (though the index vs position terminology
+  is unfortunate in my opinion).
+
+{1:resolutions Resolved without strong rationale}
+
+The following points were resolved for the first release without
+a strong rationale.
+
+{ul
+{- Push backs. Using {!Bytesrw.Bytes.Reader.push_back} is allowed at the
+   beginning of the stream and thus allows to push back to negative positions.
+   This could have been disallowed (in which case {!Bytesrw.Bytes.Reader.empty}
+   can become a value again). One use can be to push a header before
+   a stream, while still having byte positions aligned on the stream
+   (using {!Bytesrw.Bytes.Reader.val-append} for that would shift positions).
+   Unclear. {b Update.} In fact it is used in Webs_unix.Fd.bytes_reader for
+   creating the reader for bodies, after reading the HTTP header we have [n] bytes of
+   the body in our buffer, we create a reader at position [n] that reads
+   from the fd and push back the initial bytes. So in fact it seems to be
+   a good idea in order to start readers at precise positions despite the fact
+   that you may have pulled too much data.}
+{- For now it was decided not to give access to the reader and writer
+   in [read] and [write] functions. This means they can't access
+   their properties. Some combinators in [Bytesrw] internally
+   mutate the [read] field afterwards because they want to access the reader
+   in the definition of the [read] function, this is not possible with the API.
+   In filters for reporting read error positions those are generally reported
+   by the reader that filters so the underlying reader is available for using
+   with {!Bytesrw.Bytes.Reader.error}. It's a bit less clear for writers.}
+{- {!Bytesrw.Bytes.Reader.tap} and {!Bytesrw.Bytes.Writer.tap} are
+   just {!Fun.id} filters with a side effect, they could be
+   removed. We choose to keep them for now, it's doesn't seem to hurt
+   to have a name for that.}
+{- System errors. When readers and writers use system calls it's
+   a bit unclear whether the errors ([Sys_error] and [Unix_error]) should be
+   transformed into stream errors. For now we decided not to. That is we
+   consider that to be an error of the ressource rather than an error of
+   the stream.}}
+
+{1:upstream Upstreaming}
+
+{b If we determine that the API works well} we should consider
+proposing to upstream the extension of {!Bytesrw.Bytes}.
+
+In particular it would be an alternative to the
+{{:https://github.com/ocaml/RFCs/blob/master/rfcs/modular_io.md}modular
+IO proposal}. The core code is mostly trivial it's "just" three data
+structures. But added code is more code to maintain.
+
+However here are a few things to consider:
+
+{ul
+{- The labels with lengths are not abbreviated, we have [~length] and
+   [~slice_length], the Stdlib uses [~len]. A counter here is to
+   mention that this corresponds to the name of the fields
+   of the structures and there is little point to multiply the names
+   for the same thing (and using [Bytes.Slice.len] would be weird and
+   inconsistent with [{String,Bytes}.length]).}
+
+{- While most functions use a [first] + [length] for specifying ranges
+   a few functions are also provided with the (extremely nice I have to
+   say) inclusive [?first], [?last] range mechanism which was was
+   {{:https://github.com/ocaml/ocaml/pull/9893}percieved negatively} by
+   upstream for strings. For wrong reasons in my opinion revolving
+   around aesthetics of [+/-1] (counter 1: clarity; counter 2: depends
+   on your use case, you then also need to add +/-1) and provability
+   (?). It's a pity since it's a very usable interface that avoids a
+   lot of footgunish index computations and brings general code reading
+   clarity by requiring less mental labor. It's also consistent with
+   OCaml's own inclusive [for] loop and certainly not
+   {{:https://en.wikipedia.org/wiki/Comparison_of_programming_languages_(array)#Slicing}an
+  anomaly} in the language design space. See the also the discussion
+  {{:https://github.com/ocaml/ocaml/pull/10480#issuecomment-887928919}here}.}
+
+{- Dependencies. A few things will need to be dispatched differently
+   module wise.
+
+   Basically the channel stuff should move to the [{In,Out}channel]
+   modules and the buffer stuff to the [Buffer] module. The
+   formatters won't make it or will end up in the unusably long-winded
+   [Format].
+
+   Besides that I don't think any functionality would be lost, in
+   particular we made sure not to use [Format] in the
+   {!Bytesrw.Bytes.Stream.type-error} interface.
+
+   One thing I can see not make it is perhaps the nice hex dump
+   formatter {!Bytesrw.Bytes.pp_hex} which is maybe too much code for
+   upstream to take.}
+{- Safety. There are two places where we don't copy a bytes/string
+   because we assume that the users abide the Slice validity
+   rule. Notably {!Bytesrw.Bytes.Reader.of_string}. Upstream will likely want
+   no unsafe usage. These places can be found with [git grep 'Unsafe is
+   ok']. We considered prefixing these functions with [unsafe_] but then
+   it creeps a bit because for example {!Bytesrw.Bytes.Reader.filter_string}
+   uses it.}}
