@@ -1,7 +1,9 @@
 {
   "name": "alcotest",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
-  "summary": "Fix partial application to use explicit parameter for compatibility with stricter typing",
-  "details": "- Modified `length_utf8` function in `alcotest_stdlib_ext.ml` to use explicit parameter `t` instead of point-free style\n- Changed from `let length_utf8 = Uutf.String.fold_utf_8 ...` to `let length_utf8 t = Uutf.String.fold_utf_8 ... t`\n- Includes a patch file (`local-restriction.patch`) documenting the change"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "compatibility"
+  ],
+  "summary": "Expand eta-reduced function to avoid locality inference issues",
+  "details": "- Modify `length_utf8` function in `alcotest_stdlib_ext.ml` to explicitly take parameter `t` instead of being point-free\n- This change works around locality/mode inference issues where the eta-reduced form causes type errors in OxCaml's stricter mode system\n- Includes a `local-restriction.patch` file documenting the change"
 }

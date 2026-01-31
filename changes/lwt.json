@@ -1,7 +1,9 @@
 {
   "name": "lwt",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
-  "summary": "Compatibility fixes for OxCaml compiler's modified AST representation and type system",
-  "details": "- **PPX AST compatibility fixes in `ppx_lwt.ml`**:\n  - Updated `Ppat_constraint` pattern to handle extra parameter: `(p,_)` → `(p,_,_)`\n  - Updated `Pexp_let` pattern for extra parameter: `(Nonrecursive, ...)` → `(_, Nonrecursive, ...)`\n  - Changed `pexp_function_cases` to `pexp_function` (5 occurrences) to match modified ppxlib API\n- **Unix socket functions in `lwt_unix.cppo.ml`**:\n  - Changed 4 socket operations (`recv`, `send`, `recvfrom`, `sendto`) from value-level conditionals to inline function definitions to work around type system differences\n- Includes `oxcaml.patch` file documenting all the changes"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "compatibility"
+  ],
+  "summary": "Compatibility updates for OxCaml AST changes and type inference fixes in ppx and Unix stubs.",
+  "details": "- **ppx_lwt.ml AST compatibility**: Update pattern matching for `Ppat_constraint` to handle 3-tuple form `(p,_,_)` instead of 2-tuple\n- **ppx_lwt.ml AST compatibility**: Update `Pexp_let` pattern to include extra leading wildcard parameter `(_, Nonrecursive, vbl, e)`\n- **ppx_lwt.ml AST compatibility**: Replace `pexp_function_cases` with `pexp_function` (5 occurrences) for updated ppxlib API\n- **lwt_unix.cppo.ml type inference fix**: Expand conditional function bindings (`do_recv`, `do_send`, `do_recvfrom`, `do_sendto`) from point-free style to explicit lambda form to help type inference with external stub functions"
 }

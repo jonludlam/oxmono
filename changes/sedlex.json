@@ -1,7 +1,9 @@
 {
   "name": "sedlex",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
-  "summary": "Adapt ppx_sedlex for OxCaml/ppxlib_jane AST changes with labeled tuples and ghost location handling",
-  "details": "- **Labeled tuple support**: Updated `Ppat_tuple` pattern matching to handle the new OxCaml AST format with labeled tuples (`([None, p0; None, p1], Closed)`) using `Ppxlib_jane.as_unlabeled_tuple`\n- **Function construction**: Replaced `Ast_helper.Exp.fun_` with `Ppxlib_jane.Ast_builder.Default.add_fun_param` for OxCaml compatibility\n- **Ghost location handling**: Added `loc_ghoster` AST traverser to mark generated code locations as ghost, preventing spurious source location issues in generated code\n- **Removed `.merlin` file**: Deleted obsolete Merlin configuration file\n- **Included patch file**: Added `sedlex+syntax+ppx_sedlex.ml.patch` documenting the changes"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "compatibility"
+  ],
+  "summary": "Compatibility fixes for OxCaml's extended AST with labeled tuples and ppxlib_jane integration",
+  "details": "- Remove unused `Ast_helper` import\n- Replace `Exp.fun_` with `Ppxlib_jane.Ast_builder.Default.add_fun_param` for function parameter construction\n- Update `Ppat_tuple` pattern matching to handle labeled tuple AST format: `([None, p0; None, p1], Closed)` instead of `[p0; p1]`\n- Use `Ppxlib_jane.as_unlabeled_tuple` helper function to extract unlabeled tuples with proper error handling\n- Add `loc_ghoster` object to mark generated code locations as ghost locations\n- Apply `loc_ghoster` transformation to all PPX-generated expressions and structures to avoid spurious location warnings\n- Include patch file documenting all modifications"
 }

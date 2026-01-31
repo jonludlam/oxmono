@@ -1,5 +1,11 @@
 {
   "name": "ocurl",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "unchanged"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "dune-port",
+    "new-feature",
+    "build-fix"
+  ],
+  "summary": "Port from autoconf to dune build system and add new libcurl features including PREREQFUNCTION, AWS_SIGV4, TCP keepalive options, NOPROXY, bigstring write callbacks, and Multi.closesocket_function.",
+  "details": "- **Build system migration**: Complete removal of autoconf/configure build system in favor of dune with dune-configurator for feature detection\n- **Package rename**: Transition from `ocurl` to `curl` package name with `curl_lwt` split into separate package\n- **New CURL options**: Added `CURLOPT_PREREQFUNCTION`, `CURLOPT_AWS_SIGV4`, `CURLOPT_PROXY_SSL_OPTIONS`, `CURLOPT_NOPROXY`, `CURLOPT_TCP_KEEPALIVE`, `CURLOPT_TCP_KEEPIDLE`, `CURLOPT_TCP_KEEPINTVL`\n- **New API functions**: Added `get_headers` for curl_easy_nextheader, `set_writefunction_buf` for zero-copy bigstring callbacks, `Multi.set_closesocket_function`\n- **Multi.wait/poll improvements**: Extended with `extra_fds` parameter for curl_multi_wait/poll extra file descriptors\n- **Runtime lock fix**: Fixed handling of runtime lock when calling curl multi callback cleanups\n- **C code modernization**: Updated to use `caml_release_runtime_system`/`caml_acquire_runtime_system` instead of deprecated enter/leave blocking section functions\n- **OCaml 5 compatibility**: Added support for OCaml 4.12+ option helpers and custom block operations"
 }

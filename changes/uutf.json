@@ -1,7 +1,10 @@
 {
   "name": "uutf",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "mixed",
-  "summary": "Add dune build support and OxCaml portability/locality annotations for data-race-free parallelism.",
-  "details": "- **Dune port**: Added dune-project, src/dune, doc/dune, test/dune; removed B0.ml, BRZO, _tags, pkg/META, pkg/pkg.ml, src/uutf.mllib\n- **OxCaml portability**: Added `@@ portable` annotation to uutf.mli header\n- **OxCaml contended arrays**: Added `magic_uncontended` external function to safely access the immutable `utf_8_len` array in a portable/contended-safe manner\n- **OxCaml locality**: Changed `'a folder` type to use `local_` function types (`'a -> local_ (int -> [...] -> 'a)`) for stack allocation optimization\n- **OxCaml compatibility**: Replaced `Bytes.empty` with `Bytes.create 0` in multiple locations (eoi, src, decoder, encoder functions) for OxCaml compatibility\n- **Test rename**: Renamed test/test.ml to test/test_uutf.ml for dune conventions"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "dune-port",
+    "oxcaml"
+  ],
+  "summary": "Add dune build support and OxCaml portability annotations with local_ folder types",
+  "details": "- **Dune port**: Added `dune-project`, `src/dune`, `test/dune`, and `doc/dune` files to replace ocamlbuild/topkg build system\n- **Removed ocamlbuild files**: Deleted `_tags`, `src/uutf.mllib`, `pkg/pkg.ml`, `pkg/META`, `B0.ml`, `BRZO`, and root `opam` file\n- **OxCaml portability**: Added `@@ portable` annotation to `uutf.mli`\n- **OxCaml local_ types**: Changed `'a folder` type to use `local_` for the curried function arguments, enabling stack allocation of intermediate closures\n- **OxCaml contended arrays**: Added `magic_uncontended` helper to handle `utf_8_len` array access in a data-race-free manner (array is immutable)\n- **Bytes.empty replacement**: Changed `Bytes.empty` to `Bytes.create 0` throughout (4 occurrences) for OxCaml compatibility\n- **Test renamed**: `test/test.ml` renamed to `test/test_uutf.ml` in dune configuration"
 }

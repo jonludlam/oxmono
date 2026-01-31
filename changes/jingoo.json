@@ -1,7 +1,9 @@
 {
   "name": "jingoo",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "compatibility"
+  ],
   "summary": "Remove .gitignore file for monorepo compatibility",
-  "details": "- Removed `.gitignore` file which contained package-specific ignore patterns that are not needed in the monorepo context"
+  "details": "- Removed `.gitignore` file that excluded build artifacts, generated files, and editor config files"
 }

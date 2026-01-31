@@ -324,7 +324,7 @@ let has_commits_since ~env ~commit ~dir =
 type analyze_result =
   | Skipped
   | Janestreet
-  | Analyzed of { change_type: Oxmono.Changes.change_type; summary: string option }
+  | Analyzed of { change_types: Oxmono.Changes.change_type list; summary: string option }
   | Failed of string
 
 (** Write changes JSON using typed Changes record *)
@@ -357,7 +357,7 @@ let analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force ~sou
     if is_janestreet && not force then begin
       Log.app (fun m -> m "[%s] JaneStreet package, skipping Claude analysis" package_name);
       let changes = Oxmono.Changes.make ~name:package_name ~git_commit
-        ~change_type:Oxmono.Changes.Janestreet () in
+        ~change_types:[Oxmono.Changes.Janestreet] () in
       write_changes_json ~fs ~changes_file changes;
       Janestreet
     end else begin
@@ -393,9 +393,9 @@ let analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force ~sou
         if not has_differences then begin
           Log.app (fun m -> m "[%s] No differences, skipping Claude" package_name);
           let changes = Oxmono.Changes.make ~name:package_name ~git_commit
-            ~change_type:Oxmono.Changes.Unchanged () in
+            ~change_types:[Oxmono.Changes.Unchanged] () in
           write_changes_json ~fs ~changes_file changes;
-          Analyzed { change_type = Oxmono.Changes.Unchanged; summary = None }
+          Analyzed { change_types = [Oxmono.Changes.Unchanged]; summary = None }
         end else begin
         (* Build prompt for Claude - tell it to diff the directories itself *)
         let prompt =
@@ -409,7 +409,7 @@ IMPORTANT: Only run commands that operate on these two directories. Do not acces
 
 To see the differences, run: diff -ruN %s %s
 
-Please categorize and summarize the changes. The change_type should be one of:
+Please categorize and summarize the changes. The change_types should be a list containing one or more of:
 - "unchanged": No meaningful differences (empty diff)
 - "dune-port": Main change is adding dune build support
 - "oxcaml": Uses OxCaml features like unboxed types, stack allocation, or data-race-free parallelism
@@ -417,14 +417,15 @@ Please categorize and summarize the changes. The change_type should be one of:
 - "bugfix": Bug fixes not yet in upstream
 - "compatibility": Compatibility fixes for the monorepo
 - "build-fix": Build system fixes beyond just dune
-- "mixed": Multiple types of changes
+
+If a package has multiple types of changes, include all applicable types in the list.
 
 Provide:
 - name: "%s"
 - git_commit: "%s"
-- change_type: The most appropriate category from above
-- summary: A single sentence summary (e.g., "Add dune support" or "Use OxCaml unboxed types for performance"). OMIT this field if change_type is "unchanged".
-- details: Longer markdown with bullet points detailing specific changes. OMIT this field if change_type is "unchanged".
+- change_types: Array of applicable categories from above (e.g., ["dune-port", "oxcaml"])
+- summary: A single sentence summary (e.g., "Add dune support" or "Use OxCaml unboxed types for performance"). OMIT this field if change_types is ["unchanged"].
+- details: Longer markdown with bullet points detailing specific changes. OMIT this field if change_types is ["unchanged"].
 
 Respond with ONLY the JSON object matching the schema.|} package_name pristine_dir modified_dir pristine_dir modified_dir package_name git_commit
         in
@@ -497,12 +498,13 @@ Respond with ONLY the JSON object matching the schema.|} package_name pristine_d
           | Ok changes ->
             (* Write typed record back to file *)
             write_changes_json ~fs ~changes_file changes;
-            let change_type = Oxmono.Changes.change_type changes in
+            let change_types = Oxmono.Changes.change_types changes in
             let summary = Oxmono.Changes.summary changes in
-            Log.app (fun m -> m "[%s] Done: %s%s" package_name
-              (Oxmono.Changes.change_type_to_string change_type)
+            let types_str = String.concat ", " (List.map Oxmono.Changes.change_type_to_string change_types) in
+            Log.app (fun m -> m "[%s] Done: [%s]%s" package_name
+              types_str
               (match summary with Some s -> " - " ^ s | None -> ""));
-            Analyzed { change_type; summary })
+            Analyzed { change_types; summary })
         end
       end
     end
@@ -620,15 +622,34 @@ let get_package_version ~root name =
     else None
   ) try_paths
 
-(** Generate the Packages section as markdown tables grouped by type *)
+(** Generate the Packages section as markdown grouped by type *)
 let generate_status_markdown ~root changes =
   let buf = Buffer.create 8192 in
   Buffer.add_string buf "# Packages\n\n";
 
-  (* Group by change_type *)
+  (* Priority order for selecting which section a package appears in *)
+  let type_priority = function
+    | Oxmono.Changes.Oxcaml -> 0
+    | Oxmono.Changes.Dune_port -> 1
+    | Oxmono.Changes.New_feature -> 2
+    | Oxmono.Changes.Bugfix -> 3
+    | Oxmono.Changes.Compatibility -> 4
+    | Oxmono.Changes.Build_fix -> 5
+    | Oxmono.Changes.Janestreet -> 6
+    | Oxmono.Changes.Unchanged -> 7
+  in
+
+  (* Get highest priority change type from list *)
+  let primary_type change_types =
+    match List.sort (fun a b -> compare (type_priority a) (type_priority b)) change_types with
+    | [] -> Oxmono.Changes.Unchanged
+    | t :: _ -> t
+  in
+
+  (* Group by primary (highest priority) change type *)
   let by_type = Hashtbl.create 16 in
   List.iter (fun c ->
-    let ct = Oxmono.Changes.change_type c in
+    let ct = primary_type (Oxmono.Changes.change_types c) in
     let existing = Hashtbl.find_opt by_type ct |> Option.value ~default:[] in
     Hashtbl.replace by_type ct (c :: existing)
   ) changes;
@@ -641,7 +662,6 @@ let generate_status_markdown ~root changes =
     Oxmono.Changes.Bugfix, "Bug Fixes", "Packages with bug fixes not yet in upstream";
     Oxmono.Changes.Compatibility, "Compatibility", "Packages with monorepo compatibility changes";
     Oxmono.Changes.Build_fix, "Build Fixes", "Packages with build system fixes";
-    Oxmono.Changes.Mixed, "Mixed", "Packages with multiple types of changes";
     Oxmono.Changes.Janestreet, "JaneStreet", "Packages from github.com/janestreet or github.com/oxcaml (unmodified)";
     Oxmono.Changes.Unchanged, "Unchanged", "Packages with no modifications from upstream";
   ] in
@@ -653,9 +673,7 @@ let generate_status_markdown ~root changes =
     | None -> name
   in
 
-  let render_table pkgs =
-    Buffer.add_string buf "| Package | Summary | Details |\n";
-    Buffer.add_string buf "|---------|---------|--------|\n";
+  let render_bullets pkgs =
     let sorted = List.sort (fun a b ->
       String.compare (Oxmono.Changes.name a) (Oxmono.Changes.name b)
     ) pkgs in
@@ -664,16 +682,17 @@ let generate_status_markdown ~root changes =
       let display_name = name_with_version name in
       let summary = Oxmono.Changes.summary c |> Option.value ~default:"" in
       let details = Oxmono.Changes.details c in
-      let details_col = match details with
-        | None -> ""
+      Buffer.add_string buf (Printf.sprintf "- **%s**: %s" display_name summary);
+      (match details with
+        | None -> ()
         | Some d ->
-          let escaped = d
-            |> String.split_on_char '|' |> String.concat "\\|"
-            |> String.split_on_char '\n' |> String.concat "<br>"
-          in
-          Printf.sprintf "<details><summary>▶</summary><br>%s</details>" escaped
-      in
-      Buffer.add_string buf (Printf.sprintf "| %s | %s | %s |\n" display_name summary details_col)
+          Buffer.add_string buf "\n  <details><summary>Details</summary>\n\n";
+          (* Indent each line of details *)
+          String.split_on_char '\n' d |> List.iter (fun line ->
+            Buffer.add_string buf (Printf.sprintf "  %s\n" line)
+          );
+          Buffer.add_string buf "  </details>");
+      Buffer.add_string buf "\n"
     ) sorted
   in
 
@@ -691,11 +710,11 @@ let generate_status_markdown ~root changes =
     | None | Some [] -> ()
     | Some pkgs ->
       Buffer.add_string buf (Printf.sprintf "## %s\n\n%s\n\n" title desc);
-      (* Use comma-separated list for JaneStreet and Unchanged, table for others *)
+      (* Use comma-separated list for JaneStreet and Unchanged, bullet list for others *)
       if ct = Oxmono.Changes.Janestreet || ct = Oxmono.Changes.Unchanged then
         render_list pkgs
       else
-        render_table pkgs;
+        render_bullets pkgs;
       Buffer.add_string buf "\n"
   ) sections;
 

@@ -1,7 +1,9 @@
 {
   "name": "rresult",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "dune-port",
-  "summary": "Add dune build support, replacing ocamlbuild/topkg build system",
-  "details": "- Added `dune-project` with lang dune 3.20\n- Added `src/dune` defining rresult and rresult.top libraries\n- Added `test/dune` with executable and runtest alias\n- Added `doc/dune` for documentation\n- Renamed `opam` to `rresult.opam` (dune convention)\n- Removed ocamlbuild files: `_tags`, `src/rresult.mllib`, `src/rresult_top.mllib`\n- Removed topkg files: `pkg/pkg.ml`, `pkg/META`\n- Removed B0 build file: `B0.ml`"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "dune-port"
+  ],
+  "summary": "Add dune build support, replacing ocamlbuild/topkg build system.",
+  "details": "- Added `dune-project` file with lang dune 3.20\n- Added `src/dune` with two libraries: `rresult` (main library) and `rresult.top` (toplevel support)\n- Added install stanza for `rresult_top_init.ml`\n- Added `test/dune` with executable and runtest rule\n- Added `doc/dune` for documentation\n- Moved `opam` to `rresult.opam` (dune naming convention)\n- Removed ocamlbuild files: `_tags`, `src/rresult.mllib`, `src/rresult_top.mllib`\n- Removed topkg files: `pkg/pkg.ml`, `pkg/META`\n- Removed B0 build configuration: `B0.ml`"
 }

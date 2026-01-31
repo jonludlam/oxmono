@@ -1,7 +1,10 @@
 {
   "name": "dune",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
-  "summary": "Eta-expand partially applied functions for OxCaml compiler compatibility",
-  "details": "- **v1.ml (configurator)**: Eta-expand `create_process` function to take explicit `stdin`, `stdout`, `stderr` arguments instead of partial application of `Unix.create_process` and `Unix.create_process_env`\n- **v1.ml (configurator)**: Wrap `prerr_endline` and `log` in lambdas (`fun s -> prerr_endline s`) instead of using them as bare function values\n- **fpath.ml (stdune)**: Eta-expand `Unix.unlink` to `fun s -> Unix.unlink s` instead of direct function reference\n- **csexp_rpc.ml**: Rename parameters from `t b` to `fd bytes pos len` and eta-expand `send` and `Unix.single_write` calls\n- **dune_trace.ml**: Wrap `Stdlib.output_string out` in a lambda (`fun s -> Stdlib.output_string out s`)\n- **oxcaml-dune.patch**: Added patch file documenting all the above changes\n- **boot/dune.install**: Removed (cleanup)"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "oxcaml",
+    "compatibility"
+  ],
+  "summary": "Fix partial application issues for OxCaml mode compliance and remove boot install file.",
+  "details": "- **OxCaml mode fixes for partial application**: Several functions are wrapped with explicit eta-expansion to avoid partial application issues with OxCaml's stricter mode checking:\n  - `otherlibs/configurator/src/v1.ml`: `create_process` changed to take explicit `stdin stdout stderr` parameters\n  - `otherlibs/configurator/src/v1.ml`: `prerr_endline` and `log` wrapped as `fun s -> prerr_endline s` and `fun s -> log s`\n  - `otherlibs/stdune/src/fpath.ml`: `Unix.unlink` wrapped as `fun s -> Unix.unlink s`\n  - `src/csexp_rpc/csexp_rpc.ml`: `write` function parameters made explicit (`fd bytes pos len` instead of `t b`)\n  - `src/dune_trace/dune_trace.ml`: `Stdlib.output_string out` wrapped as `fun s -> Stdlib.output_string out s`\n- **Removed file**: `boot/dune.install` removed (build system cleanup)\n- **Patch file added**: `oxcaml-dune.patch` contains the same fixes for documentation/reproducibility"
 }

@@ -1,7 +1,9 @@
 {
   "name": "logs",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "dune-port",
-  "summary": "Add dune build support for logs and all sub-libraries",
-  "details": "- Add `dune-project` file with dune 3.20 and package name\n- Add `dune` files for all libraries:\n  - `src/dune` for the core `logs` library\n  - `src/fmt/dune` for `logs.fmt` (with install stanza for `logs_fmt_top_init.ml`)\n  - `src/browser/dune` for `logs.browser` (optional, depends on js_of_ocaml-compiler.runtime)\n  - `src/cli/dune` for `logs.cli` (depends on cmdliner)\n  - `src/lwt/dune` for `logs.lwt` (optional, depends on lwt)\n  - `src/threaded/dune` for `logs.threaded` (optional, depends on threads)\n  - `src/top/dune` for `logs.top` (with install stanza for `logs_top_init.ml`)\n- Add `doc/dune` for documentation\n- Add `logs.opam` file (moved from `opam`)\n- Remove legacy build files: `B0.ml`, `BRZO`, `_tags`, `pkg/META`, `pkg/pkg.ml`, `src/logs.mllib`"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "dune-port"
+  ],
+  "summary": "Add dune build support replacing ocamlbuild/topkg build system",
+  "details": "- Add `dune-project` file with lang dune 3.20\n- Add `dune` files for all sub-libraries: core `logs`, `logs.fmt`, `logs.browser`, `logs.cli`, `logs.lwt`, `logs.threaded`, `logs.top`\n- Add `doc/dune` for documentation\n- Move `opam` file to `logs.opam` (standard dune convention)\n- Remove ocamlbuild/topkg files: `B0.ml`, `BRZO`, `_tags`, `pkg/pkg.ml`, `pkg/META`, `src/logs.mllib`\n- Mark optional libraries (`logs.browser`, `logs.lwt`, `logs.threaded`) with `(optional)` in dune\n- Use `(wrapped false)` to maintain backward compatibility with existing module paths\n- Add install stanzas for top-level init files (`logs_top_init.ml`, `logs_fmt_top_init.ml`)"
 }

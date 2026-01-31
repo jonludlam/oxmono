@@ -1,7 +1,9 @@
 {
   "name": "brr",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "dune-port",
-  "summary": "Replace ocamlbuild/topkg build system with dune while preserving the same library structure.",
-  "details": "- Remove ocamlbuild files: `B0.ml`, `BRZO`, `_tags`, `myocamlbuild.ml`, `pkg/pkg.ml`, `pkg/META`, `src/brr.mllib`\n- Add `dune-project` file with lang dune 3.20\n- Add `src/dune` for main brr library with modules and js_of_ocaml-compiler.runtime dependency\n- Add `src/ocaml_poke/dune` for brr.ocaml_poke sublibrary\n- Add `src/ocaml_poke_ui/dune` for brr.ocaml_poke_ui sublibrary\n- Add `src/poke/dune` for brr.poke sublibrary with js_of_ocaml-toplevel dependency\n- Add `src/poked/dune` for brr.poked sublibrary\n- Add `src/console/dune` with install stanza for console assets (devtools.html, devtools.js, etc.)\n- Add `doc/dune` for documentation and odoc-assets installation\n- Move `opam` to `brr.opam` (standard dune naming convention)"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "dune-port"
+  ],
+  "summary": "Port from ocamlbuild/topkg/B0 build system to dune",
+  "details": "- Remove ocamlbuild files: `B0.ml`, `BRZO`, `_tags`, `myocamlbuild.ml`, `pkg/META`, `pkg/pkg.ml`, `src/brr.mllib`\n- Add `dune-project` file with lang dune 3.20\n- Add dune files for all libraries:\n  - `src/dune`: Main `brr` library with explicit module list\n  - `src/ocaml_poke/dune`: `brr.ocaml_poke` sub-library\n  - `src/ocaml_poke_ui/dune`: `brr.ocaml_poke_ui` sub-library\n  - `src/poke/dune`: `brr.poke` sub-library\n  - `src/poked/dune`: `brr.poked` sub-library\n- Add `src/console/dune` for installing console share files\n- Add `doc/dune` for documentation and odoc assets installation\n- Move opam file from `opam` to `brr.opam` (standard dune location)"
 }

@@ -1,7 +1,9 @@
 {
   "name": "psq",
-  "git_commit": "ca087e398f28a83d5ac0c1f41bf194412dcbd5ba",
-  "change_type": "compatibility",
-  "summary": "Remove seq library dependency for monorepo compatibility",
-  "details": "- Remove `(libraries seq)` from `src/dune` - the `seq` module is part of the OCaml standard library since OCaml 4.07 and doesn't need to be declared as an explicit dependency in the monorepo environment"
+  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "change_types": [
+    "compatibility"
+  ],
+  "summary": "Remove seq library dependency as it is now part of stdlib",
+  "details": "- Remove `(libraries seq)` from dune file since `Seq` is now part of the OCaml standard library (since OCaml 4.14)"
 }
