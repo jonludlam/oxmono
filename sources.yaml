@@ -27,7 +27,7 @@ packages:
     archive:
       url: 'https://github.com/mmottl/pcre-ocaml/releases/download/8.0.5/pcre-8.0.5.tbz'
       checksum: sha256=ed9bcf88d781767ad6a7c0480aff09d5889f2fc500dda0d1620a1786d4e44490
-  opam-core:
+  opam:
     archive:
       url: 'https://github.com/ocaml/opam/archive/refs/tags/2.5.0.tar.gz'
       checksum: md5=79d057547b7114e31334bc4f556bc541
