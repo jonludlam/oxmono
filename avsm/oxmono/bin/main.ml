@@ -269,6 +269,10 @@ let changes_schema =
   json_object [
     json_field "type" (json_string "object");
     json_field "properties" (json_object [
+      json_field "name" (json_object [
+        json_field "type" (json_string "string");
+        json_field "description" (json_string "Package name")
+      ]);
       json_field "git_commit" (json_object [
         json_field "type" (json_string "string");
         json_field "description" (json_string "Git commit hash this diff was generated against")
@@ -293,14 +297,14 @@ let changes_schema =
       ]);
       json_field "details" (json_object [
         json_field "type" (json_string "string");
-        json_field "description" (json_string "Longer markdown description with bullet points detailing specific changes")
+        json_field "description" (json_string "Longer markdown description with bullet points detailing specific changes. Omit this field if change_type is 'unchanged'.")
       ])
     ]);
     json_field "required" (json_array [
+      json_string "name";
       json_string "git_commit";
       json_string "change_type";
-      json_string "summary";
-      json_string "details"
+      json_string "summary"
     ])
   ]
 
@@ -418,12 +422,13 @@ Please categorize and summarize the changes. The change_type should be one of:
 - "mixed": Multiple types of changes
 
 Provide:
+- name: "%s"
 - git_commit: "%s"
 - change_type: The most appropriate category from above
 - summary: A single sentence summary (e.g., "Add dune support" or "Use OxCaml unboxed types for performance")
-- details: Longer markdown with bullet points detailing specific changes
+- details: Longer markdown with bullet points detailing specific changes (OMIT this field entirely if change_type is "unchanged")
 
-Respond with ONLY the JSON object matching the schema.|} package_name pristine_dir modified_dir pristine_dir modified_dir git_commit
+Respond with ONLY the JSON object matching the schema.|} package_name pristine_dir modified_dir pristine_dir modified_dir package_name git_commit
       in
       Log.app (fun m -> m "[%s] Analyzing with Claude..." package_name);
       (* Configure Claude with structured output *)
