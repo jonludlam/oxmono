@@ -258,55 +258,13 @@ let list_cmd =
 
 (** {1 Changes Command} *)
 
-(** JSON Schema for package change records *)
-let changes_schema =
-  let open Jsont in
-  let meta = Meta.none in
-  let json_object fields = Object (fields, meta) in
-  let json_string s = String (s, meta) in
-  let json_array items = Array (items, meta) in
-  let json_field name value = ((name, meta), value) in
-  json_object [
-    json_field "type" (json_string "object");
-    json_field "properties" (json_object [
-      json_field "name" (json_object [
-        json_field "type" (json_string "string");
-        json_field "description" (json_string "Package name")
-      ]);
-      json_field "git_commit" (json_object [
-        json_field "type" (json_string "string");
-        json_field "description" (json_string "Git commit hash this diff was generated against")
-      ]);
-      json_field "change_type" (json_object [
-        json_field "type" (json_string "string");
-        json_field "enum" (json_array [
-          json_string "unchanged";
-          json_string "dune-port";
-          json_string "oxcaml";
-          json_string "new-feature";
-          json_string "bugfix";
-          json_string "compatibility";
-          json_string "build-fix";
-          json_string "mixed"
-        ]);
-        json_field "description" (json_string "Type of changes: unchanged (no meaningful diff), dune-port (adding dune build support), oxcaml (uses oxcaml features like unboxed types), new-feature (adds new features not in upstream), bugfix (bug fixes not yet in upstream), compatibility (compatibility fixes for monorepo), build-fix (build system fixes beyond dune), mixed (multiple types of changes)")
-      ]);
-      json_field "summary" (json_object [
-        json_field "type" (json_string "string");
-        json_field "description" (json_string "Single sentence summary of the changes")
-      ]);
-      json_field "details" (json_object [
-        json_field "type" (json_string "string");
-        json_field "description" (json_string "Longer markdown description with bullet points detailing specific changes. Omit this field if change_type is 'unchanged'.")
-      ])
-    ]);
-    json_field "required" (json_array [
-      json_string "name";
-      json_string "git_commit";
-      json_string "change_type";
-      json_string "summary"
-    ])
-  ]
+(** Check if a URL is from JaneStreet or OxCaml GitHub orgs *)
+let is_janestreet_url url =
+  let url_lower = String.lowercase_ascii url in
+  String.starts_with ~prefix:"https://github.com/janestreet" url_lower ||
+  String.starts_with ~prefix:"https://github.com/oxcaml" url_lower ||
+  String.starts_with ~prefix:"git+https://github.com/janestreet" url_lower ||
+  String.starts_with ~prefix:"git+https://github.com/oxcaml" url_lower
 
 (** Get current git HEAD commit *)
 let get_git_head ~env =
@@ -365,12 +323,21 @@ let has_commits_since ~env ~commit ~dir =
 (** Result type for single package analysis *)
 type analyze_result =
   | Skipped
-  | Analyzed of { change_type: string; summary: string }
+  | Janestreet
+  | Analyzed of { change_type: Oxmono.Changes.change_type; summary: string option }
   | Failed of string
+
+(** Write changes JSON using typed Changes record *)
+let write_changes_json ~fs ~changes_file (changes : Oxmono.Changes.t) =
+  match Jsont_bytesrw.encode_string ~format:Jsont.Indent Oxmono.Changes.jsont changes with
+  | Ok json_str ->
+    Eio.Path.save ~create:(`Or_truncate 0o644) Eio.Path.(fs / changes_file) json_str
+  | Error err ->
+    failwith (Printf.sprintf "Failed to encode changes JSON: %s" err)
 
 (** Analyze a single package and write changes file.
     Returns the result of the analysis. *)
-let analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force package_name =
+let analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force ~sources package_name =
   let pristine_dir = Filename.concat wt_path package_name in
   let modified_dir = Filename.concat root (Filename.concat "opam" package_name) in
   let opam_subdir = Filename.concat "opam" package_name in
@@ -381,29 +348,42 @@ let analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force pack
   else if not (Sys.file_exists modified_dir && Sys.is_directory modified_dir) then
     Failed (Printf.sprintf "Modified directory opam/%s does not exist" package_name)
   else
-    (* Check if we need to re-analyze *)
-    let should_analyze =
-      if force then true
-      else
-        match load_changes_commit ~fs changes_file with
-        | None -> true
-        | Some prev_commit ->
-          if has_commits_since ~env ~commit:prev_commit ~dir:opam_subdir then begin
-            Log.app (fun m -> m "[%s] Changes detected since %s" package_name
-              (String.sub prev_commit 0 (min 7 (String.length prev_commit))));
-            true
-          end else begin
-            Log.debug (fun m -> m "[%s] No changes since %s, skipping"
-              package_name (String.sub prev_commit 0 (min 7 (String.length prev_commit))));
-            false
-          end
+    (* Check if package is from JaneStreet/OxCaml *)
+    let is_janestreet =
+      match Oxmono.Source.find_package package_name sources with
+      | Some source -> is_janestreet_url (Oxmono.Source.source_url source)
+      | None -> false
     in
-    if not should_analyze then
-      Skipped
-    else begin
-      (* Build prompt for Claude - tell it to diff the directories itself *)
-      let prompt =
-        Printf.sprintf {|Analyze the differences between the upstream pristine version and the local modified version of the OCaml package "%s".
+    if is_janestreet && not force then begin
+      Log.app (fun m -> m "[%s] JaneStreet package, skipping Claude analysis" package_name);
+      let changes = Oxmono.Changes.make ~name:package_name ~git_commit
+        ~change_type:Oxmono.Changes.Janestreet () in
+      write_changes_json ~fs ~changes_file changes;
+      Janestreet
+    end else begin
+      (* Check if we need to re-analyze *)
+      let should_analyze =
+        if force then true
+        else
+          match load_changes_commit ~fs changes_file with
+          | None -> true
+          | Some prev_commit ->
+            if has_commits_since ~env ~commit:prev_commit ~dir:opam_subdir then begin
+              Log.app (fun m -> m "[%s] Changes detected since %s" package_name
+                (String.sub prev_commit 0 (min 7 (String.length prev_commit))));
+              true
+            end else begin
+              Log.debug (fun m -> m "[%s] No changes since %s, skipping"
+                package_name (String.sub prev_commit 0 (min 7 (String.length prev_commit))));
+              false
+            end
+      in
+      if not should_analyze then
+        Skipped
+      else begin
+        (* Build prompt for Claude - tell it to diff the directories itself *)
+        let prompt =
+          Printf.sprintf {|Analyze the differences between the upstream pristine version and the local modified version of the OCaml package "%s".
 
 Directory paths:
 - Pristine upstream: %s
@@ -425,55 +405,66 @@ Provide:
 - name: "%s"
 - git_commit: "%s"
 - change_type: The most appropriate category from above
-- summary: A single sentence summary (e.g., "Add dune support" or "Use OxCaml unboxed types for performance")
-- details: Longer markdown with bullet points detailing specific changes (OMIT this field entirely if change_type is "unchanged")
+- summary: A single sentence summary (e.g., "Add dune support" or "Use OxCaml unboxed types for performance"). OMIT this field if change_type is "unchanged".
+- details: Longer markdown with bullet points detailing specific changes. OMIT this field if change_type is "unchanged".
 
 Respond with ONLY the JSON object matching the schema.|} package_name pristine_dir modified_dir pristine_dir modified_dir package_name git_commit
-      in
-      Log.app (fun m -> m "[%s] Analyzing with Claude..." package_name);
-      (* Configure Claude with structured output *)
-      let output_format = Claude.Proto.Structured_output.of_json_schema changes_schema in
-      let options =
-        Claude.Options.default
-        |> Claude.Options.with_output_format output_format
-        |> Claude.Options.with_permission_callback auto_allow_callback
-        |> Claude.Options.with_max_turns 5
-      in
-      (* Run Claude *)
-      let process_mgr = Eio.Stdenv.process_mgr env in
-      let clock = Eio.Stdenv.clock env in
-      let structured_output = ref None in
-      Eio.Switch.run (fun sw ->
-        let client = Claude.Client.create ~sw ~process_mgr ~clock ~options () in
-        Claude.Client.query client prompt;
-        let responses = Claude.Client.receive_all client in
-        List.iter (function
-          | Claude.Response.Complete result ->
-            structured_output := Claude.Response.Complete.structured_output result
-          | Claude.Response.Error err ->
-            Log.err (fun m -> m "[%s] Claude error: %s" package_name (Claude.Response.Error.message err))
-          | _ -> ()
-        ) responses
-      );
-      (* Process result *)
-      match !structured_output with
-      | None ->
-        Failed (Printf.sprintf "[%s] Claude did not return structured output" package_name)
-      | Some json ->
-        (* Pretty print JSON to file *)
-        let json_str =
-          match Jsont_bytesrw.encode_string ~format:Jsont.Indent Jsont.json json with
-          | Ok s -> s
-          | Error err -> err
         in
-        (* Write to file *)
-        Eio.Path.save ~create:(`Or_truncate 0o644)
-          Eio.Path.(fs / changes_file)
-          json_str;
-        let change_type = json_get_string json "change_type" |> Option.value ~default:"unknown" in
-        let summary = json_get_string json "summary" |> Option.value ~default:"" in
-        Log.app (fun m -> m "[%s] Done: %s - %s" package_name change_type summary);
-        Analyzed { change_type; summary }
+        Log.app (fun m -> m "[%s] Analyzing with Claude..." package_name);
+        (* Create a temp directory for Claude session to avoid polluting the main directory *)
+        let temp_dir = Filename.concat (Filename.get_temp_dir_name ())
+          (Printf.sprintf "oxmono-claude-%s-%d" package_name (Random.int 1000000))
+        in
+        Sys.mkdir temp_dir 0o755;
+        (* Configure Claude with structured output and temp working directory *)
+        let output_format = Claude.Proto.Structured_output.of_json_schema Oxmono.Changes.json_schema in
+        let options =
+          Claude.Options.default
+          |> Claude.Options.with_output_format output_format
+          |> Claude.Options.with_permission_callback auto_allow_callback
+          |> Claude.Options.with_max_turns 5
+          |> Claude.Options.with_cwd Eio.Path.(fs / temp_dir)
+        in
+        (* Run Claude *)
+        let process_mgr = Eio.Stdenv.process_mgr env in
+        let clock = Eio.Stdenv.clock env in
+        let structured_output = ref None in
+        Eio.Switch.run (fun sw ->
+          let client = Claude.Client.create ~sw ~process_mgr ~clock ~options () in
+          Claude.Client.query client prompt;
+          let responses = Claude.Client.receive_all client in
+          List.iter (function
+            | Claude.Response.Complete result ->
+              structured_output := Claude.Response.Complete.structured_output result
+            | Claude.Response.Error err ->
+              Log.err (fun m -> m "[%s] Claude error: %s" package_name (Claude.Response.Error.message err))
+            | _ -> ()
+          ) responses
+        );
+        (* Clean up temp directory *)
+        (try
+          Array.iter (fun f -> Sys.remove (Filename.concat temp_dir f)) (Sys.readdir temp_dir);
+          Sys.rmdir temp_dir
+        with _ -> ());
+        (* Process result *)
+        match !structured_output with
+        | None ->
+          Failed (Printf.sprintf "[%s] Claude did not return structured output" package_name)
+        | Some json ->
+          (* Decode JSON to typed Changes record *)
+          (match Jsont.Json.decode Oxmono.Changes.jsont json with
+          | Error err ->
+            Failed (Printf.sprintf "[%s] Failed to decode changes: %s" package_name err)
+          | Ok changes ->
+            (* Write typed record back to file *)
+            write_changes_json ~fs ~changes_file changes;
+            let change_type = Oxmono.Changes.change_type changes in
+            let summary = Oxmono.Changes.summary changes in
+            Log.app (fun m -> m "[%s] Done: %s%s" package_name
+              (Oxmono.Changes.change_type_to_string change_type)
+              (match summary with Some s -> " - " ^ s | None -> ""));
+            Analyzed { change_type; summary })
+      end
     end
 
 let changes_cmd =
@@ -482,7 +473,7 @@ let changes_cmd =
     Arg.(value & pos 0 (some string) None & info [] ~docv:"PACKAGE" ~doc)
   in
   let force =
-    let doc = "Force re-analysis even if no commits since last analysis." in
+    let doc = "Force re-analysis even if no commits since last analysis. Also forces analysis of JaneStreet packages." in
     Arg.(value & flag & info ["f"; "force"] ~doc)
   in
   let run () package_name_opt force =
@@ -504,16 +495,16 @@ let changes_cmd =
       get_git_head ~env
       |> Result.map_error (fun e -> Printf.sprintf "Failed to get git HEAD: %s" (process_err ["git"] e))
     in
+    (* Load sources.yaml for URL lookup *)
+    let* sources =
+      Oxmono.Sources_file.load ~fs Oxmono.Sources_file.sources_filename
+      |> Result.map_error (Printf.sprintf "Failed to load sources.yaml: %s")
+    in
     (* Get list of packages to analyze *)
     let* packages =
       match package_name_opt with
       | Some name -> Ok [name]
       | None ->
-        (* Get all packages from sources.yaml *)
-        let* sources =
-          Oxmono.Sources_file.load ~fs Oxmono.Sources_file.sources_filename
-          |> Result.map_error (Printf.sprintf "Failed to load sources.yaml: %s")
-        in
         let pkgs = Oxmono.Source.packages sources |> List.map fst in
         if pkgs = [] then
           Error "No packages found in sources.yaml"
@@ -525,18 +516,19 @@ let changes_cmd =
     (* Analyze packages concurrently *)
     let results = ref [] in
     let analyze pkg =
-      let result = analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force pkg in
+      let result = analyze_package ~env ~fs ~root ~wt_path ~changes_dir ~git_commit ~force ~sources pkg in
       results := (pkg, result) :: !results
     in
     Eio.Fiber.List.iter ~max_fibers:20 analyze packages;
     (* Summarize results *)
     let analyzed = List.filter (fun (_, r) -> match r with Analyzed _ -> true | _ -> false) !results in
     let skipped = List.filter (fun (_, r) -> match r with Skipped -> true | _ -> false) !results in
+    let janestreet = List.filter (fun (_, r) -> match r with Janestreet -> true | _ -> false) !results in
     let failed = List.filter (fun (_, r) -> match r with Failed _ -> true | _ -> false) !results in
     if List.length packages > 1 then begin
       Log.app (fun m -> m "");
-      Log.app (fun m -> m "Summary: %d analyzed, %d skipped, %d failed"
-        (List.length analyzed) (List.length skipped) (List.length failed));
+      Log.app (fun m -> m "Summary: %d analyzed, %d janestreet, %d skipped, %d failed"
+        (List.length analyzed) (List.length janestreet) (List.length skipped) (List.length failed));
       List.iter (fun (pkg, r) ->
         match r with
         | Failed msg -> Log.err (fun m -> m "  %s: %s" pkg msg)
