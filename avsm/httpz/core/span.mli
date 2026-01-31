@@ -11,11 +11,8 @@
 
     {[
       let #(status, req, headers) = Httpz.parse buf ~len ~limits in
-      (* req.#target is a span - compare without allocating *)
       if Span.equal buf req.#target "/api/users" then
         handle_users ()
-      else if Span.starts_with buf req.#target '/' then
-        handle_path ()
     ]}
 
     {2 String Conversion}
@@ -29,8 +26,8 @@
 (** {1 Types} *)
 
 type t =
-  #{ off : int16#  (** Byte offset into buffer *)
-   ; len : int16#  (** Length in bytes *)
+  #{ off : int16#
+   ; len : int16#
    }
 (** Unboxed span record. Zero allocation. *)
 
@@ -42,20 +39,10 @@ val make : off:int16# -> len:int16# -> t
 (** {1 Accessors} *)
 
 val off : t -> int
-(** [off span] returns the byte offset as a regular [int].
-    Use for array indexing. *)
+(** [off span] returns the byte offset as a regular [int]. *)
 
 val len : t -> int
-(** [len span] returns the length as a regular [int].
-    Use for comparisons with [String.length] etc. *)
-
-val off16 : t -> int16#
-(** [off16 span] returns the byte offset as [int16#].
-    Use for unboxed arithmetic. *)
-
-val len16 : t -> int16#
-(** [len16 span] returns the length as [int16#].
-    Use for unboxed arithmetic. *)
+(** [len span] returns the length as a regular [int]. *)
 
 val is_empty : t -> bool
 (** [is_empty span] returns [true] if [span.len = 0]. *)
@@ -70,26 +57,7 @@ val equal_caseless : local_ bytes -> t -> string -> bool
 (** [equal_caseless buf span s] returns [true] if the bytes at [span]
     in [buf] equal string [s], ignoring ASCII case. *)
 
-(** {1 Character Operations} *)
-
-val starts_with : local_ bytes -> t -> char# -> bool
-(** [starts_with buf span c] returns [true] if [span] starts with [c]. *)
-
-val find_char : local_ bytes -> t -> char# -> int16#
-(** [find_char buf span c] returns the index of the first occurrence of [c]
-    in [span], or [-1] as [int16#] if not found. *)
-
-val unsafe_get : local_ bytes -> t -> int16# -> char#
-(** [unsafe_get buf span i] returns the character at position [i] within [span].
-    No bounds checking. *)
-
-(** {1 Subspan Operations} *)
-
-val sub : t -> pos:int16# -> len:int16# -> t
-(** [sub span ~pos ~len] creates a subspan. No bounds checking. *)
-
-val skip_char : local_ bytes -> t -> char# -> t
-(** [skip_char buf span c] returns span with leading [c] removed if present. *)
+(** {1 Operations} *)
 
 val split_on_char : local_ bytes -> t -> char# -> #(t * t)
 (** [split_on_char buf span c] splits [span] at the first occurrence of [c].
@@ -100,55 +68,14 @@ val split_on_char : local_ bytes -> t -> char# -> #(t * t)
 (** {1 Integer Parsing} *)
 
 val parse_int64 : local_ bytes -> t -> #(int64# * bool)
-(** [parse_int64 buf span] parses a decimal integer from [span] with
-    overflow protection.
+(** [parse_int64 buf span] parses a decimal integer with overflow protection.
 
     Returns [#(value, overflow)] where:
     - [value]: The parsed value, or [-1L] if empty/invalid
-    - [overflow]: [true] if the value overflows int64
-
-    {[
-      let #(len, overflow) = Span.parse_int64 buf cl_span in
-      if overflow || I64.compare len max_cl > 0 then reject_request ()
-    ]} *)
+    - [overflow]: [true] if the value overflows int64 *)
 
 (** {1 String Conversion} *)
 
 val to_string : local_ bytes -> t -> string
 (** [to_string buf span] copies the span contents to a new string.
     This allocates - use span comparisons when possible. *)
-
-val to_bytes : local_ bytes -> t -> bytes
-(** [to_bytes buf span] copies the span contents to a new bytes value.
-    This allocates. *)
-
-(** {1 int16# Utilities}
-
-    These utilities centralize [int16#] conversions and comparisons
-    used throughout the httpz stack. *)
-
-val of_int : int -> int16#
-(** [of_int n] converts a regular [int] to [int16#]. *)
-
-val to_int : int16# -> int
-(** [to_int n] converts an [int16#] to a regular [int]. *)
-
-val add : int16# -> int16# -> int16#
-(** [add a b] returns [a + b]. *)
-
-val gt : int16# -> int16# -> bool
-(** [gt a b] returns [true] if [a > b]. *)
-
-val gte : int16# -> int16# -> bool
-(** [gte a b] returns [true] if [a >= b]. *)
-
-val one : int16#
-(** The constant [1] as [int16#]. *)
-
-(** {1 Pretty Printing} *)
-
-val pp : Stdlib.Format.formatter -> t -> unit
-(** [pp fmt span] prints the span structure (offset and length). *)
-
-val pp_with_buf : local_ bytes -> Stdlib.Format.formatter -> t -> unit
-(** [pp_with_buf buf fmt span] prints the actual content of [span] from [buf]. *)

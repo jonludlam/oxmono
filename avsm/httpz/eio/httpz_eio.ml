@@ -7,8 +7,9 @@
 
 open Base
 
-let i16 = Httpz.Span.of_int
-let to_int = Httpz.Span.to_int
+module I16 = Stdlib_stable.Int16_u
+let[@inline] i16 x = I16.of_int x
+let[@inline] to_int x = I16.to_int x
 
 (** {1 Response Writing} *)
 

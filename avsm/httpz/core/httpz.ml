@@ -40,13 +40,13 @@ let default_limits = Buf_read.default_limits
 
 (* Parsing implementation using Parser combinators *)
 
-(* Use centralized int16# helpers from Span *)
+module I16 = Stdlib_stable.Int16_u
 module I64 = Stdlib_upstream_compatible.Int64_u
-let i16 = Span.of_int
-let gt16 = Span.gt
-let gte16 = Span.gte
-let add16 = Span.add
-let one16 = Span.one
+let[@inline] i16 x = I16.of_int x
+let[@inline] gt16 a b = I16.compare a b > 0
+let[@inline] gte16 a b = I16.compare a b >= 0
+let[@inline] add16 a b = I16.add a b
+let one16 : int16# = I16.of_int 1
 
 (* Connection header disposition *)
 type conn_value = Conn_default | Conn_close | Conn_keep_alive

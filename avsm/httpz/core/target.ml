@@ -2,7 +2,8 @@
 
 open Base
 
-let i16 = Span.of_int
+module I16 = Stdlib_stable.Int16_u
+let[@inline] i16 x = I16.of_int x
 
 (** Parsed target with path (no leading slash) and query. *)
 type t =
