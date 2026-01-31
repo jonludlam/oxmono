@@ -29,6 +29,15 @@ val buffer_size : int
 (** Maximum headers per request. *)
 val max_headers : int16#
 
+(** Find CRLF position - returns -1 if not found. *)
+val find_crlf : local_ bytes -> pos:int16# -> len:int16# -> int16#
+
+(** Find CRLF and check for bare CR in one pass.
+    Returns [(crlf_pos, has_bare_cr)] where [crlf_pos] is -1 if not found.
+    A bare CR is any CR not immediately followed by LF (RFC 7230 Section 3.5).
+    This is more efficient than calling [find_crlf] followed by [has_bare_cr]. *)
+val find_crlf_check_bare_cr : local_ bytes -> pos:int16# -> len:int16# -> #(int16# * bool)
+
 (** Convert int to int16#. *)
 val i16 : int -> int16#
 
@@ -53,9 +62,6 @@ val is_space : char# -> bool
 (** Convert character to lowercase. *)
 val to_lower : char# -> char#
 
-(** Find CRLF sequence starting at [pos]. Returns position of CR or [-1] as int16# if not found. *)
-val find_crlf : local_ bytes -> pos:int16# -> len:int16# -> int16#
-
 (** Pretty-print buffer. *)
 val pp : Stdlib.Format.formatter -> bytes -> unit
 
@@ -71,10 +77,3 @@ type limits =
 
 (** Default limits: 100MB content, 16KB headers, 100 header count, 16MB chunks. *)
 val default_limits : limits
-
-(** Detect bare CR (CR not followed by LF) - RFC 7230 Section 3.5.
-    Used to prevent HTTP request smuggling attacks. *)
-val has_bare_cr : local_ bytes -> pos:int16# -> len:int16# -> bool
-
-(** Check if a value contains CRLF injection attempt. *)
-val has_crlf_injection : local_ bytes -> pos:int16# -> len:int16# -> bool

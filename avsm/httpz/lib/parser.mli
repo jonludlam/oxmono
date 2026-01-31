@@ -85,7 +85,7 @@ val request_line : pstate -> pos:int16# -> #(Method.t * Span.t * Version.t * int
 
 (** Parse a single header line.
     Returns (header_name, name_span, value_span, new_pos). *)
-val parse_header : pstate -> pos:int16# -> #(Header_name.t * Span.t * Span.t * int16#)
+val parse_header : pstate -> pos:int16# -> #(Header_name.t * Span.t * Span.t * int16# * bool)
 
 (** Check if at end of headers (CRLF at current position). *)
 val is_headers_end : pstate -> pos:int16# -> bool

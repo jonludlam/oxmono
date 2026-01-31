@@ -198,14 +198,15 @@ let[@inline] request_line st ~(pos : int16#) : #(Method.t * Span.t * Version.t *
   #(meth, target, version, pos)
 
 (* Parse a single header: name: OWS value OWS CRLF
-   Returns: (name, name_span, value_span, new_pos) *)
-let[@inline] parse_header st ~(pos : int16#) : #(Header_name.t * Span.t * Span.t * int16#) =
+   Returns: (name, name_span, value_span, new_pos, has_bare_cr)
+   The bare CR check is integrated to avoid a second scan. *)
+let[@inline] parse_header st ~(pos : int16#) : #(Header_name.t * Span.t * Span.t * int16# * bool) =
   let #(name_span, pos) = token st ~pos in
   let pos = char #':' st ~pos in
   let pos = ows st ~pos in
   let value_start = pos in
-  (* Find CRLF - need to scan for it *)
-  let crlf_pos = Buf_read.find_crlf st.#buf ~pos ~len:st.#len in
+  (* Find CRLF and check for bare CR in one pass *)
+  let #(crlf_pos, has_bare_cr) = Buf_read.find_crlf_check_bare_cr st.#buf ~pos ~len:st.#len in
   Err.partial_when (to_int crlf_pos < 0);
   (* Trim trailing whitespace *)
   let mutable value_end = crlf_pos in
@@ -219,7 +220,7 @@ let[@inline] parse_header st ~(pos : int16#) : #(Header_name.t * Span.t * Span.t
   in
   let pos = add16 crlf_pos (i16 2) in
   let name = Header_name.of_span st.#buf name_span in
-  #(name, name_span, value_span, pos)
+  #(name, name_span, value_span, pos, has_bare_cr)
 
 (* Check for end of headers (empty line = CRLF) *)
 let[@inline] is_headers_end st ~(pos : int16#) : bool =

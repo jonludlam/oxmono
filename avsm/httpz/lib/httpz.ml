@@ -131,9 +131,8 @@ let rec parse_headers_loop (pst : Parser.pstate) ~pos ~acc (st : header_state) ~
   )
   else (
     Err.when_ (gte16 st.#count limits.#max_header_count) Err.Headers_too_large;
-    let #(name, name_span, value_span, pos) = Parser.parse_header pst ~pos in
-    Err.when_ (has_bare_cr pst.#buf ~pos:(Span.off16 value_span) ~len:(Span.len16 value_span))
-      Err.Bare_cr_detected;
+    let #(name, name_span, value_span, pos, has_bare_cr) = Parser.parse_header pst ~pos in
+    Err.when_ has_bare_cr Err.Bare_cr_detected;
     let next_count = add16 st.#count one16 in
     match name with
     | Header_name.Content_length ->
