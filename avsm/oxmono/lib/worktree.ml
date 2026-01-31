@@ -8,11 +8,11 @@
 module Log = (val Logs.src_log (Logs.Src.create "oxmono.worktree") : Logs.LOG)
 
 let sources_branch = "sources"
-let worktree_name = "oxmono-src"
+let worktree_dir = "sources"
 
 let worktree_path ~root =
-  (* Worktree is at ../oxmono-src relative to the monorepo root *)
-  Filename.concat (Filename.dirname root) worktree_name
+  (* Worktree is at sources/ inside the monorepo root (gitignored) *)
+  Filename.concat root worktree_dir
 
 let ensure_sources_branch ~env ~cwd =
   if Git.branch_exists ~env ~cwd ~branch:sources_branch then begin
@@ -62,29 +62,19 @@ let ensure_worktree ~env ~cwd =
       | Ok () -> Ok wt_path
   end
 
-let copy_to_worktree ~env ~cwd ~package_name ~source_dir =
+let commit_package ~env ~cwd ~package_name =
   match ensure_worktree ~env ~cwd with
   | Error e -> Error e
   | Ok wt_path ->
-    let source_path = Eio.Path.native_exn source_dir in
-    let dest_path = Filename.concat wt_path package_name in
-    Log.info (fun m -> m "Copying %s to worktree at %s" source_path dest_path);
-    (* Remove existing destination if present *)
-    let _ = Process.run ~env ["rm"; "-rf"; dest_path] in
-    (* Copy source to worktree *)
-    match Process.run ~env ["cp"; "-r"; source_path; dest_path] with
+    let wt_cwd = Eio.Path.(Eio.Stdenv.fs env / wt_path) in
+    match Git.add ~env ~cwd:wt_cwd [package_name] with
     | Error e -> Error e
     | Ok () ->
-      (* Commit changes in worktree *)
-      let wt_cwd = Eio.Path.(Eio.Stdenv.fs env / wt_path) in
-      match Git.add ~env ~cwd:wt_cwd [package_name] with
+      let message = Printf.sprintf "Update %s from upstream" package_name in
+      match Git.commit ~env ~cwd:wt_cwd ~message with
+      | Error (`Exit_code 1) ->
+        (* No changes to commit, that's ok *)
+        Log.info (fun m -> m "No changes to commit for %s" package_name);
+        Ok ()
       | Error e -> Error e
-      | Ok () ->
-        let message = Printf.sprintf "Update %s from upstream" package_name in
-        match Git.commit ~env ~cwd:wt_cwd ~message with
-        | Error (`Exit_code 1) ->
-          (* No changes to commit, that's ok *)
-          Log.info (fun m -> m "No changes to commit for %s" package_name);
-          Ok ()
-        | Error e -> Error e
-        | Ok () -> Ok ()
+      | Ok () -> Ok ()

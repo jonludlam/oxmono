@@ -81,31 +81,32 @@ let sync_cmd =
         Log.app (fun m -> m "No packages in sources.yaml");
         0
       end else begin
-        (* Ensure worktree exists *)
+        (* Ensure worktree exists at sources/ *)
         match Oxmono.Worktree.ensure_worktree ~env ~cwd with
         | Error e ->
           Log.err (fun m -> m "Failed to setup worktree: %s" (Oxmono.Process.error_to_string ["worktree"] e));
           1
-        | Ok _wt_path ->
+        | Ok wt_path ->
           let errors = ref 0 in
           List.iter (fun (name, source) ->
             Log.app (fun m -> m "Syncing %s..." name);
-            let source_dir = Eio.Path.(fs / "sources" / name) in
+            (* Download directly into the worktree *)
+            let target_dir = Eio.Path.(fs / wt_path / name) in
             let result = match source with
               | Oxmono.Source.Git { url; commit } ->
-                Oxmono.Git.clone_or_update ~env ~url ~target:source_dir ~commit
+                Oxmono.Git.clone_or_update ~env ~url ~target:target_dir ~commit
               | Oxmono.Source.Archive { url; checksum } ->
-                Oxmono.Archive.fetch_and_extract ~env ~url ~checksum ~target:source_dir
+                Oxmono.Archive.fetch_and_extract ~env ~url ~checksum ~target:target_dir
             in
             match result with
             | Error e ->
               Log.err (fun m -> m "Failed to sync %s: %s" name (Oxmono.Process.error_to_string [name] e));
               incr errors
             | Ok () ->
-              (* Copy to worktree *)
-              match Oxmono.Worktree.copy_to_worktree ~env ~cwd ~package_name:name ~source_dir with
+              (* Commit in worktree *)
+              match Oxmono.Worktree.commit_package ~env ~cwd ~package_name:name with
               | Error e ->
-                Log.err (fun m -> m "Failed to copy %s to worktree: %s" name (Oxmono.Process.error_to_string [name] e));
+                Log.err (fun m -> m "Failed to commit %s: %s" name (Oxmono.Process.error_to_string [name] e));
                 incr errors
               | Ok () ->
                 Log.app (fun m -> m "Synced %s" name)
@@ -126,36 +127,32 @@ let diff_cmd =
   in
   let run () package_name =
     Eio_main.run @@ fun env ->
-    let fs = Eio.Stdenv.fs env in
     let cwd = Eio.Stdenv.cwd env in
-    let source_dir = Eio.Path.(fs / "sources" / package_name) in
-    if not (Eio.Path.is_directory source_dir) then begin
-      Log.err (fun m -> m "Source directory sources/%s does not exist" package_name);
+    let root = Eio.Path.native_exn cwd in
+    let wt_path = Oxmono.Worktree.worktree_path ~root in
+    let pristine_dir = Filename.concat wt_path package_name in
+    let modified_dir = Filename.concat root (Filename.concat "opam" package_name) in
+    if not (Sys.file_exists pristine_dir && Sys.is_directory pristine_dir) then begin
+      Log.err (fun m -> m "Pristine directory %s does not exist. Run 'oxmono sync' first." pristine_dir);
+      1
+    end else if not (Sys.file_exists modified_dir && Sys.is_directory modified_dir) then begin
+      Log.err (fun m -> m "Modified directory opam/%s does not exist" package_name);
       1
     end else begin
-      let root = Eio.Path.native_exn cwd in
-      let wt_path = Oxmono.Worktree.worktree_path ~root in
-      let pristine_dir = Filename.concat wt_path package_name in
-      if not (Sys.file_exists pristine_dir && Sys.is_directory pristine_dir) then begin
-        Log.err (fun m -> m "Pristine directory %s does not exist. Run 'oxmono sync' first." pristine_dir);
+      (* Run diff: pristine (sources/) vs modified (opam/) *)
+      match Oxmono.Process.run ~env ["diff"; "-ruN"; pristine_dir; modified_dir] with
+      | Ok () ->
+        Log.app (fun m -> m "No differences for %s" package_name);
+        0
+      | Error (`Exit_code 1) ->
+        (* diff returns 1 when there are differences - that's expected *)
+        0
+      | Error e ->
+        Log.err (fun m -> m "Diff failed: %s" (Oxmono.Process.error_to_string ["diff"] e));
         1
-      end else begin
-        let source_path = Eio.Path.native_exn source_dir in
-        (* Run diff *)
-        match Oxmono.Process.run ~env ["diff"; "-ruN"; pristine_dir; source_path] with
-        | Ok () ->
-          Log.app (fun m -> m "No differences for %s" package_name);
-          0
-        | Error (`Exit_code 1) ->
-          (* diff returns 1 when there are differences - that's expected *)
-          0
-        | Error e ->
-          Log.err (fun m -> m "Diff failed: %s" (Oxmono.Process.error_to_string ["diff"] e));
-          1
-      end
     end
   in
-  let doc = "Show differences between local sources and pristine upstream" in
+  let doc = "Show differences between opam/<pkg> and pristine sources/<pkg>" in
   let info = Cmd.info "diff" ~doc in
   Cmd.v info Term.(const run $ logging_t $ package_name)
 
