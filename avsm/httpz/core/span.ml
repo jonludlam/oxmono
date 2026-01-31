@@ -15,9 +15,13 @@ type t =
 let[@inline] make ~off:(off : int16#) ~len:(len : int16#) : t =
   #{ off; len }
 
-(* Conversions *)
+(* Conversions and int16# utilities *)
 let[@inline] of_int x = I16.of_int x
 let[@inline] to_int x = I16.to_int x
+let[@inline] add a b = I16.add a b
+let[@inline] gt a b = I16.compare a b > 0
+let[@inline] gte a b = I16.compare a b >= 0
+let one : int16# = I16.of_int 1
 
 (* Accessors - return int16# to minimize conversion *)
 let[@inline] off16 (sp : t) = sp.#off

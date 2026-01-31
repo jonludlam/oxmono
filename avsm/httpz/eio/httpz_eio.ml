@@ -7,16 +7,14 @@
 
 open Base
 
-module I16 = Stdlib_stable.Int16_u
-
-let[@inline] i16 x = I16.of_int x
-let[@inline] to_int x = I16.to_int x
+let i16 = Httpz.Span.of_int
+let to_int = Httpz.Span.to_int
 
 (** {1 Response Writing} *)
 
 (** Write response headers to buffer using typed Header_name.t.
     Returns header length. *)
-let rec write_headers_loop buf off (local_ headers : Httpz_server.Route.resp_header list) =
+let rec write_headers_loop buf off (headers : Httpz_server.Route.resp_header list) =
   match headers with
   | [] -> off
   | (name, value) :: rest ->
@@ -24,7 +22,7 @@ let rec write_headers_loop buf off (local_ headers : Httpz_server.Route.resp_hea
       write_headers_loop buf off rest
 
 let write_response_headers buf ~off ~keep_alive ~content_length version ~status
-    ~(local_ headers : Httpz_server.Route.resp_header list) =
+    ~(headers : Httpz_server.Route.resp_header list) =
   let off = Httpz.Res.write_status_line buf ~off status version in
   let off = write_headers_loop buf off headers in
   let off = match content_length with
@@ -67,7 +65,7 @@ let create_conn flow =
 
 (** Create a respond function that writes directly to the connection.
     This is the CPS callback passed to dispatch - no intermediate resp record. *)
-let make_respond conn ~keep_alive version ~status ~(local_ headers) body =
+let make_respond conn ~keep_alive version ~status ~headers body =
   let buf = conn.write_buf in
   match body with
   | Httpz_server.Route.Empty ->
@@ -167,11 +165,10 @@ let handle_request conn ~routes ~on_request =
   let version = req.#version in
   match status with
   | Httpz.Buf_read.Complete ->
-      let target = req.#target in
       let meth = req.#meth in
-      (* Get path for logging *)
-      let parsed = Httpz.Target.parse buf target in
-      let path_span = Httpz.Target.path parsed in
+      (* Parse target once - used for both logging and dispatch *)
+      let target = Httpz.Target.parse buf req.#target in
+      let path_span = Httpz.Target.path target in
       let path_str = Httpz.Span.to_string buf path_span in
       (* Update keep_alive before dispatch *)
       conn.keep_alive <- req.#keep_alive;

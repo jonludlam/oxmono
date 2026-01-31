@@ -326,7 +326,6 @@ let all_routes cfg =
       (* Index routes *)
       get_ [] index;
       get_ [ "about" ] index;
-      get_ [ "about"; "" ] index;
       (* Atom feeds *)
       get_ [ "wiki.xml" ] (atom_feed cfg);
       get_ [ "news.xml" ] (atom_feed cfg);
@@ -341,34 +340,23 @@ let all_routes cfg =
       (* Sitemap *)
       get_ [ "sitemap.xml" ] (sitemap cfg);
       (* Papers *)
-      get ("papers" **> seg) (paper cfg);
-      get ("papers" **> seg <** "") (paper cfg);
+      get ("papers" / seg root) (fun (slug, ()) -> paper cfg slug);
       get_ [ "papers" ] papers;
-      get_ [ "papers"; "" ] papers;
       (* Ideas *)
-      get ("ideas" **> seg) idea;
-      get ("ideas" **> seg <** "") idea;
+      get ("ideas" / seg root) (fun (slug, ()) -> idea slug);
       get_ [ "ideas" ] ideas;
-      get_ [ "ideas"; "" ] ideas;
       (* Notes *)
-      get ("notes" **> seg) note;
-      get ("notes" **> seg <** "") note;
+      get ("notes" / seg root) (fun (slug, ()) -> note slug);
       get_ [ "notes" ] notes;
-      get_ [ "notes"; "" ] notes;
       (* Videos/Talks *)
-      get ("videos" **> seg) video;
-      get ("videos" **> seg <** "") video;
+      get ("videos" / seg root) (fun (slug, ()) -> video slug);
       get_ [ "talks" ] videos;
-      get_ [ "talks"; "" ] videos;
       get_ [ "videos" ] videos;
-      get_ [ "videos"; "" ] videos;
       (* Projects *)
-      get ("projects" **> seg) project;
-      get ("projects" **> seg <** "") project;
+      get ("projects" / seg root) (fun (slug, ()) -> project slug);
       get_ [ "projects" ] projects;
-      get_ [ "projects"; "" ] projects;
       (* Legacy news redirect *)
-      get ("news" **> seg) news_redirect;
+      get ("news" / seg root) (fun (slug, ()) -> news_redirect slug);
       (* Wiki/News legacy *)
       get_ [ "wiki" ] wiki;
       get_ [ "news" ] news;
@@ -376,14 +364,13 @@ let all_routes cfg =
       get_ [ "api"; "entries" ] pagination_api;
       (* Bushel link graph *)
       get_ [ "bushel" ] bushel_graph;
-      get_ [ "bushel"; "" ] bushel_graph;
       get_ [ "bushel"; "graph.json" ] bushel_graph_data;
       (* Well-known endpoints *)
-      get (".well-known" **> seg) (well_known cfg);
+      get (".well-known" / seg root) (fun (key, ()) -> well_known cfg key);
       (* Robots.txt *)
       get_ [ "robots.txt" ] (robots_txt cfg);
       (* Static files *)
-      get ("assets" **> tail) (fun path -> static_file ~dir:cfg.paths.assets_dir path);
-      get ("images" **> tail) (fun path -> static_file ~dir:cfg.paths.images_dir path);
-      get ("static" **> tail) (fun path -> static_file ~dir:cfg.paths.static_dir path);
+      get ("assets" / tail) (fun path -> static_file ~dir:cfg.paths.assets_dir (String.concat "/" path));
+      get ("images" / tail) (fun path -> static_file ~dir:cfg.paths.images_dir (String.concat "/" path));
+      get ("static" / tail) (fun path -> static_file ~dir:cfg.paths.static_dir (String.concat "/" path));
     ]

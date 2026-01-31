@@ -2,4 +2,4 @@
  (name httpz_server)
  (public_name httpz.server)
  (modules route httpz_server)
- (libraries httpz base base_bigstring))
+ (libraries httpz base base_bigstring base_trie))

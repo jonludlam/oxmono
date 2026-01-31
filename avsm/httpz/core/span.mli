@@ -145,13 +145,28 @@ val to_bytes : local_ bytes -> t -> bytes
 (** [to_bytes buf span] copies the span contents to a new bytes value.
     This allocates. *)
 
-(** {1 Utility} *)
+(** {1 int16# Utilities}
+
+    These utilities centralize [int16#] conversions and comparisons
+    used throughout the httpz stack. *)
 
 val of_int : int -> int16#
 (** [of_int n] converts a regular [int] to [int16#]. *)
 
 val to_int : int16# -> int
 (** [to_int n] converts an [int16#] to a regular [int]. *)
+
+val add : int16# -> int16# -> int16#
+(** [add a b] returns [a + b]. *)
+
+val gt : int16# -> int16# -> bool
+(** [gt a b] returns [true] if [a > b]. *)
+
+val gte : int16# -> int16# -> bool
+(** [gte a b] returns [true] if [a >= b]. *)
+
+val one : int16#
+(** The constant [1] as [int16#]. *)
 
 (** {1 Pretty Printing} *)
 
