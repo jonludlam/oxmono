@@ -114,8 +114,8 @@ let[@inline] is_empty (path : Span.t) : bool = Span.len path = 0
 let rec find_query_param (local_ buf : bytes) (query : Span.t) (name : string) : #(bool * Span.t) =
   if Span.is_empty query then #(false, empty_span)
   else
-    let #(pair, rest) = Span.split_on_char buf query '&' in
-    let #(key, value) = Span.split_on_char buf pair '=' in
+    let #(pair, rest) = Span.split_on_char buf query #'&' in
+    let #(key, value) = Span.split_on_char buf pair #'=' in
     if Span.equal buf key name then #(true, value)
     else find_query_param buf rest name
 ;;
@@ -124,8 +124,8 @@ let rec find_query_param (local_ buf : bytes) (query : Span.t) (name : string) :
 let rec fold_query_params (local_ buf : bytes) (query : Span.t) ~init ~f =
   if Span.is_empty query then init
   else
-    let #(pair, rest) = Span.split_on_char buf query '&' in
-    let #(key, value) = Span.split_on_char buf pair '=' in
+    let #(pair, rest) = Span.split_on_char buf query #'&' in
+    let #(key, value) = Span.split_on_char buf pair #'=' in
     fold_query_params buf rest ~init:(f init key value) ~f
 ;;
 

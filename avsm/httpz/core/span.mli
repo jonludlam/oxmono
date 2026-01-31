@@ -64,54 +64,38 @@ val is_empty : t -> bool
 
 val equal : local_ bytes -> t -> string -> bool
 (** [equal buf span s] returns [true] if the bytes at [span] in [buf]
-    are exactly equal to string [s]. Case-sensitive.
-
-    {[
-      if Span.equal buf target "/index.html" then serve_index ()
-    ]} *)
+    are exactly equal to string [s]. Case-sensitive. *)
 
 val equal_caseless : local_ bytes -> t -> string -> bool
 (** [equal_caseless buf span s] returns [true] if the bytes at [span]
-    in [buf] equal string [s], ignoring ASCII case.
-
-    {[
-      (* Match header name case-insensitively *)
-      if Span.equal_caseless buf hdr.name_span "x-request-id" then ...
-    ]} *)
+    in [buf] equal string [s], ignoring ASCII case. *)
 
 (** {1 Character Operations} *)
 
-val starts_with : local_ bytes -> t -> char -> bool
-(** [starts_with buf span c] returns [true] if [span] starts with character [c]. *)
+val starts_with : local_ bytes -> t -> char# -> bool
+(** [starts_with buf span c] returns [true] if [span] starts with [c]. *)
 
-val find_char : local_ bytes -> t -> char -> int
+val find_char : local_ bytes -> t -> char# -> int16#
 (** [find_char buf span c] returns the index of the first occurrence of [c]
-    in [span], or [-1] if not found. The index is relative to [span.off]. *)
+    in [span], or [-1] as [int16#] if not found. *)
 
-val unsafe_get : local_ bytes -> t -> int -> char
+val unsafe_get : local_ bytes -> t -> int16# -> char#
 (** [unsafe_get buf span i] returns the character at position [i] within [span].
-    No bounds checking - caller must ensure [0 <= i < span.len]. *)
+    No bounds checking. *)
 
 (** {1 Subspan Operations} *)
 
-val sub : t -> pos:int -> len:int -> t
-(** [sub span ~pos ~len] creates a subspan starting at relative offset [pos]
-    with the given length. No bounds checking. *)
+val sub : t -> pos:int16# -> len:int16# -> t
+(** [sub span ~pos ~len] creates a subspan. No bounds checking. *)
 
-val skip_char : local_ bytes -> t -> char -> t
-(** [skip_char buf span c] returns a new span with the leading character
-    removed if it equals [c], otherwise returns [span] unchanged. *)
+val skip_char : local_ bytes -> t -> char# -> t
+(** [skip_char buf span c] returns span with leading [c] removed if present. *)
 
-val split_on_char : local_ bytes -> t -> char -> #(t * t)
+val split_on_char : local_ bytes -> t -> char# -> #(t * t)
 (** [split_on_char buf span c] splits [span] at the first occurrence of [c].
 
-    Returns [#(before, after)] where [after] excludes the separator character.
-    If [c] is not found, returns [#(span, empty_span)].
-
-    {[
-      let #(path, query) = Span.split_on_char buf target '?' in
-      (* path = everything before '?', query = everything after *)
-    ]} *)
+    Returns [#(before, after)] where [after] excludes the separator.
+    If [c] is not found, returns [#(span, empty_span)]. *)
 
 (** {1 Integer Parsing} *)
 

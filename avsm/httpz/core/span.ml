@@ -109,59 +109,62 @@ let[@inline] parse_int64 (local_ buf) (sp : t) : #(int64# * bool) =
 
 (* {1 Span Utilities} *)
 
+let zero16 : int16# = I16.of_int 0
+
 (** Check if span is empty. *)
-let[@inline] is_empty (sp : t) = to_int sp.#len = 0
+let[@inline] is_empty (sp : t) = I16.compare sp.#len zero16 = 0
 
 (** Create a sub-span starting at relative offset with given length. *)
-let[@inline] sub (sp : t) ~pos ~len : t =
-  #{ off = I16.add sp.#off (of_int pos); len = of_int len }
+let[@inline] sub (sp : t) ~(pos : int16#) ~(len : int16#) : t =
+  #{ off = I16.add sp.#off pos; len }
 
-(** Find first occurrence of character in span. Returns -1 if not found. *)
-let[@inline] find_char (local_ buf : bytes) (sp : t) (c : char) : int =
+(** Find first occurrence of character in span. Returns -1 as int16# if not found. *)
+let[@inline] find_char (local_ buf : bytes) (sp : t) (c : char#) : int16# =
   let sp_off = off sp in
   let sp_len = len sp in
   let mutable i = 0 in
   let mutable found = -1 in
   while found = -1 && i < sp_len do
-    if Char.equal (Bytes.unsafe_get buf (sp_off + i)) c
+    if Char_u.equal (Buf_read.peek buf (I16.of_int (sp_off + i))) c
     then found <- i
     else i <- i + 1
   done;
-  found
+  I16.of_int found
 ;;
 
 (** Check if span starts with given character. *)
-let[@inline] starts_with (local_ buf : bytes) (sp : t) (c : char) : bool =
-  len sp > 0 && Char.equal (Bytes.unsafe_get buf (off sp)) c
+let[@inline] starts_with (local_ buf : bytes) (sp : t) (c : char#) : bool =
+  I16.compare sp.#len zero16 > 0 && Char_u.equal (Buf_read.peek buf sp.#off) c
 ;;
 
 (** Skip leading character if present, return new span. *)
-let[@inline] skip_char (local_ buf : bytes) (sp : t) (c : char) : t =
+let[@inline] skip_char (local_ buf : bytes) (sp : t) (c : char#) : t =
   if starts_with buf sp c
-  then #{ off = I16.add sp.#off (of_int 1); len = I16.sub sp.#len (of_int 1) }
+  then #{ off = I16.add sp.#off one; len = I16.sub sp.#len one }
   else sp
 ;;
 
 (** Split span at first occurrence of character.
     Returns unboxed tuple #(before, after) where after excludes the separator.
     If not found, returns #(sp, empty_span). *)
-let[@inline] split_on_char (local_ buf : bytes) (sp : t) (c : char) : #(t * t) =
+let[@inline] split_on_char (local_ buf : bytes) (sp : t) (c : char#) : #(t * t) =
   let pos = find_char buf sp c in
-  if pos < 0
+  if I16.compare pos zero16 < 0
   then
-    let empty = #{ off = I16.add sp.#off sp.#len; len = of_int 0 } in
+    let empty = #{ off = I16.add sp.#off sp.#len; len = zero16 } in
     #(sp, empty)
   else
-    let before = #{ off = sp.#off; len = of_int pos } in
-    let after_off = I16.add sp.#off (of_int (pos + 1)) in
-    let after_len = I16.sub sp.#len (of_int (pos + 1)) in
+    let before = #{ off = sp.#off; len = pos } in
+    let pos_plus_one = I16.add pos one in
+    let after_off = I16.add sp.#off pos_plus_one in
+    let after_len = I16.sub sp.#len pos_plus_one in
     let after = #{ off = after_off; len = after_len } in
     #(before, after)
 ;;
 
 (** Get character at position in span. No bounds checking. *)
-let[@inline] unsafe_get (local_ buf : bytes) (sp : t) (pos : int) : char =
-  Bytes.unsafe_get buf (off sp + pos)
+let[@inline] unsafe_get (local_ buf : bytes) (sp : t) (pos : int16#) : char# =
+  Buf_read.peek buf (I16.add sp.#off pos)
 ;;
 
 (* Copy span contents to string. The exclave_ annotation allows result to escape local region. *)
