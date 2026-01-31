@@ -50,6 +50,7 @@ type trailer_status =
   | Trailer_complete  (** Trailers parsed successfully *)
   | Trailer_partial   (** Need more data *)
   | Trailer_malformed (** Invalid trailer *)
+  | Trailer_bare_cr   (** Bare CR detected - RFC 7230 Section 3.5 security violation *)
 
 (** Convert trailer status to string. *)
 val trailer_status_to_string : trailer_status -> string

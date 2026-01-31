@@ -73,28 +73,6 @@ let[@inline always] to_lower (c : char#) : char# =
   | _ -> c
 ;;
 
-(* CRLF as int16: little-endian 0x0A0D = '\n' << 8 | '\r' *)
-let crlf_int16 = 0x0A0D
-
-(* Find CRLF position - returns -1 if not found *)
-let find_crlf (local_ buf : bytes) ~(pos : int16#) ~(len : int16#) : int16# =
-  let pos = to_int pos in
-  let len = to_int len in
-  if len - pos < 2
-  then i16 (-1)
-  else (
-    let mutable p = pos in
-    let mutable found = false in
-    let last_check = len - 2 in
-    while (not found) && p <= last_check do
-      (* Read 2 bytes at once and compare to CRLF constant *)
-      if Bytes.unsafe_get_int16 buf p = crlf_int16
-      then found <- true
-      else p <- p + 1
-    done;
-    if found then i16 p else i16 (-1))
-;;
-
 (* Find CRLF and check for bare CR in one pass.
    Returns #(crlf_pos, has_bare_cr) where crlf_pos is -1 if not found.
    A bare CR is any CR not immediately followed by LF (RFC 7230 Section 3.5). *)

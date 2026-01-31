@@ -155,11 +155,13 @@ type trailer_status =
   | Trailer_complete
   | Trailer_partial
   | Trailer_malformed
+  | Trailer_bare_cr  (* RFC 7230 Section 3.5 - bare CR detected *)
 
 let trailer_status_to_string = function
   | Trailer_complete -> "Trailer_complete"
   | Trailer_partial -> "Trailer_partial"
   | Trailer_malformed -> "Trailer_malformed"
+  | Trailer_bare_cr -> "Trailer_bare_cr"
 ;;
 
 let pp_trailer_status fmt t = Stdlib.Format.fprintf fmt "%s" (trailer_status_to_string t)
@@ -205,10 +207,12 @@ let[@inline] parse_trailer_header (buf : bytes) ~pos ~len =
       p <- p + 1
     done;
     let value_start = p in
-    let crlf_pos = P.find_crlf buf ~pos:(i16 p) ~len:(i16 len) in
+    let #(crlf_pos, has_bare_cr) = P.find_crlf_check_bare_cr buf ~pos:(i16 p) ~len:(i16 len) in
     let crlf_pos_int = to_int crlf_pos in
     if crlf_pos_int < 0
     then #(Trailer_partial, Header_name.Host, i16 0, i16 0, i16 0, i16 0, i16 0)
+    else if has_bare_cr
+    then #(Trailer_bare_cr, Header_name.Host, i16 0, i16 0, i16 0, i16 0, i16 0)
     else (
       let mutable value_end = crlf_pos_int in
       while value_end > value_start && P.is_space (P.peek buf (i16 (value_end - 1))) do
@@ -232,6 +236,7 @@ let rec parse_trailers_loop (buf : bytes) ~pos ~len ~count ~acc ~max_header_coun
     match s with
     | Trailer_partial -> #(Trailer_partial, i16 pos, acc)
     | Trailer_malformed -> #(Trailer_malformed, i16 pos, acc)
+    | Trailer_bare_cr -> #(Trailer_bare_cr, i16 pos, acc)
     | Trailer_complete ->
       (* Skip forbidden trailer headers per RFC 7230 Section 4.1.2 *)
       if is_forbidden_trailer name then

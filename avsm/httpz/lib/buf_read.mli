@@ -29,13 +29,9 @@ val buffer_size : int
 (** Maximum headers per request. *)
 val max_headers : int16#
 
-(** Find CRLF position - returns -1 if not found. *)
-val find_crlf : local_ bytes -> pos:int16# -> len:int16# -> int16#
-
 (** Find CRLF and check for bare CR in one pass.
     Returns [(crlf_pos, has_bare_cr)] where [crlf_pos] is -1 if not found.
-    A bare CR is any CR not immediately followed by LF (RFC 7230 Section 3.5).
-    This is more efficient than calling [find_crlf] followed by [has_bare_cr]. *)
+    A bare CR is any CR not immediately followed by LF (RFC 7230 Section 3.5). *)
 val find_crlf_check_bare_cr : local_ bytes -> pos:int16# -> len:int16# -> #(int16# * bool)
 
 (** Convert int to int16#. *)
