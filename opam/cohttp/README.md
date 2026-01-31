@@ -20,7 +20,9 @@ libraries:
   the GitHub bindings to JavaScript and still run efficiently.
 * `Cohttp_curl` uses `libcurl`, via `ocurl`, as backend. It also comes
   with lwt (`Cohttp_curl_lwt`) and async backends (`Cohttp_curl_async`).
-* `Cohttp_eio` uses `ei`o to leverage new features from multicore ocaml 5.0.
+* `Cohttp_eio` uses `eio` to leverage new features from multicore ocaml 5.0.
+* `Cohttp_server_lwt_unix` uses lwt to implement a more efficient web server
+  with a minimal interface.
 
 You can implement other targets using the parser very easily. Look at the `IO`
 signature in `lib/s.mli` and implement that in the desired backend.
@@ -33,7 +35,6 @@ You can find help from cohttp users and maintainers at the
 
 - [Installation](#installation)
 - [Client Tutorial](#client-tutorial)
-  * [Compile and execute with ocamlbuild](#compile-and-execute-with-ocamlbuild)
   * [Compile and execute with dune](#compile-and-execute-with-dune)
 - [Dealing with timeouts](#dealing-with-timeouts)
 - [Managing sessions](#managing-sessions)
@@ -41,7 +42,6 @@ You can find help from cohttp users and maintainers at the
 - [Creating custom resolver: a Docker Socket Client example](#creating-custom-resolver--a-docker-socket-client-example)
 - [Dealing with redirects](#dealing-with-redirects)
 - [Basic Server Tutorial](#basic-server-tutorial)
-  * [Compile and execute with ocamlbuild](#compile-and-execute-with-ocamlbuild-1)
   * [Compile and execute with dune](#compile-and-execute-with-dune-1)
 - [Installed Binaries](#installed-binaries)
 - [Debugging](#debugging)
@@ -79,7 +79,7 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-let body =
+let main =
   Client.get (Uri.of_string "https://www.reddit.com/") >>= fun (resp, body) ->
   let code = resp |> Response.status |> Code.code_of_status in
   Printf.printf "Response code: %d\n" code;
@@ -89,7 +89,7 @@ let body =
   body
 
 let () =
-  let body = Lwt_main.run body in
+  let body = Lwt_main.run main in
   print_endline ("Received body\n" ^ body)
 ```
 
@@ -119,25 +119,6 @@ Consult the following modules for reference:
 
 The full documentation for the latest published version of the library is
 available on the [repository github pages](https://mirage.github.io/ocaml-cohttp/).
-
-### Compile and execute with ocamlbuild
-
-Build and execute with:
-
-```
-$ ocamlbuild -use-ocamlfind -tag thread -pkg cohttp-lwt-unix client_example.native
-$ ./client_example.native
-```
-
-For manual builds, it is usually enough to remember that cohttp ships with 6
-findlib (`ocamlfind`) libraries:
-
-* `cohttp` - Base `Cohttp` module. No platform specific functionality
-* `cohttp-async` - Async backend `Cohttp_async`
-* `cohttp-lwt` - Lwt backend without unix specifics
-* `cohttp-lwt-unix` - Unix based lwt backend
-* `cohttp-lwt-jsoo` - Jsoo (XHR) client
-* `cohttp-top` - Print cohttp types in the toplevel (`#require "cohttp-top"`)
 
 ### Compile and execute with dune
 
@@ -173,7 +154,7 @@ let compute ~time ~f =
 let body =
   let get () = Client.get (Uri.of_string "https://www.reddit.com/") in
   compute ~time:0.1 ~f:get >>= function
-  | `Timeout -> Lwt.fail_with "Timeout expired"
+  | `Timeout -> failwith "Timeout expired"
   | `Done (resp, body) -> Lwt.return (resp, body)
 ```
 
@@ -193,7 +174,7 @@ For example,
 ```ocaml
 let get_body ~uri ~timeout =
     let%bind _, body = Cohttp_async.Client.get ~interrupt:(after (sec timeout)) uri in
-    Body.to_string body    
+    Body.to_string body
 
 let body =
   let uri = Uri.of_string "https://www.reddit.com/" in
@@ -294,19 +275,18 @@ and follow_redirect ~max_redirects request_uri (response, body) =
       handle_redirect ~permanent:true ~max_redirects request_uri response
   | `Found | `Temporary_redirect ->
       handle_redirect ~permanent:false ~max_redirects request_uri response
-  | `Not_found | `Gone -> Lwt.fail_with "Not found"
+  | `Not_found | `Gone -> failwith "Not found"
   | status ->
-      Lwt.fail_with
-        (Printf.sprintf "Unhandled status: %s"
-           (Cohttp.Code.string_of_status status))
+      Printf.ksprintf failwith "Unhandled status: %s"
+          (Cohttp.Code.string_of_status status)
 
 and handle_redirect ~permanent ~max_redirects request_uri response =
-  if max_redirects <= 0 then Lwt.fail_with "Too many redirects"
+  if max_redirects <= 0 then failwith "Too many redirects"
   else
     let headers = Http.Response.headers response in
     let location = Http.Header.get headers "location" in
     match location with
-    | None -> Lwt.fail_with "Redirection without Location header"
+    | None -> failwith "Redirection without Location header"
     | Some url ->
         let open Lwt.Syntax in
         let uri = Uri.of_string url in
@@ -401,14 +381,6 @@ let server =
 let () = ignore (Lwt_main.run server)
 ```
 
-### Compile and execute with ocamlbuild
-
-Build and execute with:
-```
-$ ocamlbuild -use-ocamlfind -tag thread -pkg cohttp-lwt-unix server_example.native
-$ ./server_example.native
-```
-
 ### Compile and execute with dune
 
 Create this `dune` file
@@ -462,9 +434,9 @@ Assuming that the server is running in cohttp's source directory:
 $ cohttp-curl-lwt 'http://0.0.0.0:8080/README.md'
 ```
 
-Other examples using the async api are avaliable in the
-[examples/async](https://github.com/mirage/ocaml-cohttp/tree/master/examples)
-folder in the sources
+Other examples using the async api are available in the
+[cohttp-async/examples](https://github.com/mirage/ocaml-cohttp/tree/master/cohttp-async/examples)
+folder in the sources.
 
 ## Debugging
 

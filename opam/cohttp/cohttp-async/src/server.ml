@@ -16,11 +16,7 @@ type response_action =
   | `Response of response ]
 
 type 'r respond_t =
-  ?flush:bool ->
-  ?headers:Http.Header.t ->
-  ?body:Body.t ->
-  Http.Status.t ->
-  'r Deferred.t
+  ?headers:Http.Header.t -> ?body:Body.t -> Http.Status.t -> 'r Deferred.t
 
 let close t = Tcp.Server.close t.server
 let close_finished t = Tcp.Server.close_finished t.server
@@ -48,6 +44,8 @@ let collect_errors writer ~f =
       choice (try_with ~name:"Cohttp_async.Server.collect_errors" f) Fn.id;
     ]
 
+let reader_info = Info.of_string "Cohttp_async.Server.Expert: Create reader"
+
 let handle_client handle_request sock rd wr =
   collect_errors wr ~f:(fun () ->
       let rd = Input_channel.create rd in
@@ -61,10 +59,8 @@ let handle_client handle_request sock rd wr =
               handle_request ~body:req_body sock req >>= function
               | `Expert (res, handler) ->
                   Io.Response.write_header res wr >>= fun () ->
-                  Input_channel.to_reader
-                    (Info.of_string "Cohttp_async.Server.Expert: Create reader")
-                    rd
-                  >>= fun reader -> handler reader wr
+                  Input_channel.to_reader reader_info rd >>= fun reader ->
+                  handler reader wr
               | `Response (res, res_body) ->
                   (* There are scenarios if a client leaves before consuming the full response,
                      we might have a reference to an async Pipe that doesn't get drained.
@@ -85,7 +81,6 @@ let handle_client handle_request sock rd wr =
                     Http.Request.is_keep_alive req
                     && Http.Response.is_keep_alive res
                   in
-                  let flush = Http.Response.flush res in
                   let res =
                     let headers =
                       Http.Header.add_unless_exists
@@ -95,7 +90,7 @@ let handle_client handle_request sock rd wr =
                     in
                     { res with Http.Response.headers }
                   in
-                  Io.Response.write ~flush
+                  Io.Response.write ~flush:false
                     (Body.Private.write_body Io.Response.write_body res_body)
                     res wr
                   >>= fun () ->
@@ -104,33 +99,32 @@ let handle_client handle_request sock rd wr =
                   else Deferred.unit)
       in
       loop rd wr sock handle_request)
-  >>| fun res -> Result.ok_exn res
+  >>| Result.ok_exn
 
-let respond ?(flush = true) ?(headers = Http.Header.init ()) ?(body = `Empty)
-    status : response Deferred.t =
+let respond ?(headers = Http.Header.init ()) ?(body = `Empty) status :
+    response Deferred.t =
   let encoding = Body.transfer_encoding body in
-  let resp = Cohttp.Response.make ~status ~flush ~encoding ~headers () in
+  let resp = Cohttp.Response.make ~status ~encoding ~headers () in
   return (resp, body)
 
-let respond_with_pipe ?flush ?headers ?(code = `OK) body =
-  respond ?flush ?headers ~body:(`Pipe body) code
+let respond_with_pipe ?headers ?(code = `OK) body =
+  respond ?headers ~body:(`Pipe body) code
 
-let respond_string ?flush ?headers ?(status = `OK) body =
-  respond ?flush ?headers ~body:(`String body) status
+let respond_string ?headers ?(status = `OK) body =
+  respond ?headers ~body:(`String body) status
 
 let respond_with_redirect ?headers uri =
   let headers =
     Http.Header.add_opt_unless_exists headers "location" (Uri.to_string uri)
   in
-  respond ~flush:false ~headers `Found
+  respond ~headers `Found
 
 let resolve_local_file ~docroot ~uri =
   Cohttp.Path.resolve_local_file ~docroot ~uri
 
 let error_body_default = "<html><body><h1>404 Not Found</h1></body></html>"
 
-let respond_with_file ?flush ?headers ?(error_body = error_body_default)
-    filename =
+let respond_with_file ?headers ?(error_body = error_body_default) filename =
   Monitor.try_with ~run:`Now (fun () ->
       Reader.open_file filename >>= fun rd ->
       let body = `Pipe (Reader.pipe rd) in
@@ -138,7 +132,7 @@ let respond_with_file ?flush ?headers ?(error_body = error_body_default)
       let headers =
         Http.Header.add_opt_unless_exists headers "content-type" mime_type
       in
-      respond ?flush ~headers ~body `OK)
+      respond ~headers ~body `OK)
   >>= function
   | Ok res -> return res
   | Error _exn -> respond_string ~status:`Not_found error_body

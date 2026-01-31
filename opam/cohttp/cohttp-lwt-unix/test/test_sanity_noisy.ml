@@ -35,7 +35,7 @@ let server_noisy =
 
 let ts_noisy =
   Cohttp_lwt_unix_test.test_server_s ~port:10193 server_noisy (fun uri ->
-      let ctx = Cohttp_lwt_unix.Net.default_ctx in
+      let ctx = Lazy.force Cohttp_lwt_unix.Net.default_ctx in
       let empty_chunk () =
         Client.get ~ctx uri >>= fun (_, body) ->
         body |> Body.to_string >|= fun body ->
@@ -45,7 +45,8 @@ let ts_noisy =
         Client.get ~ctx uri >>= fun (resp, body) ->
         assert_equal (Response.status resp) `Not_modified;
         let headers = Response.headers resp in
-        assert_equal ~printer:Transfer.string_of_encoding Transfer.Unknown
+        assert_equal ~printer:Transfer.string_of_encoding
+          Transfer.(Fixed 0L)
           (Header.get_transfer_encoding headers);
         body |> Body.is_empty >|= fun is_empty ->
         assert_bool "No body returned when not modified" is_empty

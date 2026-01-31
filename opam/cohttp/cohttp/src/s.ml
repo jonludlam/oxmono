@@ -73,29 +73,25 @@ module type Http_io = sig
   module IO : IO
 
   val read : IO.ic -> [ `Eof | `Invalid of string | `Ok of t ] IO.t
-  val make_body_writer : ?flush:bool -> t -> IO.oc -> writer
+  val make_body_writer : flush:bool -> t -> IO.oc -> writer
   val make_body_reader : t -> IO.ic -> reader
   val read_body_chunk : reader -> Transfer.chunk IO.t
   val write_header : t -> IO.oc -> unit IO.t
   val write_body : writer -> string -> unit IO.t
-  val write : ?flush:bool -> (writer -> unit IO.t) -> t -> IO.oc -> unit IO.t
+  val write : flush:bool -> (writer -> unit IO.t) -> t -> IO.oc -> unit IO.t
 end
 
 module type Request = sig
   type t = {
     headers : Header.t;  (** HTTP request headers *)
     meth : Code.meth;  (** HTTP request method *)
-    scheme : string option;  (** URI scheme (http or https) *)
     resource : string;  (** Request path and query *)
     version : Code.version;  (** HTTP version, usually 1.1 *)
-    encoding : Transfer.encoding;
-        [@deprecated "this field will be removed in the future"]
   }
   [@@deriving sexp]
 
   val headers : t -> Header.t
   val meth : t -> Code.meth
-  val scheme : t -> string option
   val resource : t -> string
   val version : t -> Code.version
   val encoding : t -> Transfer.encoding
@@ -106,6 +102,7 @@ module type Request = sig
     ?version:Code.version ->
     ?encoding:Transfer.encoding ->
     ?headers:Header.t ->
+    ?absolute_form:bool ->
     Uri.t ->
     t
   (** [make ()] is a value of {!type:t}. The default values for the request, if
@@ -123,6 +120,7 @@ module type Request = sig
     ?headers:Header.t ->
     ?chunked:bool ->
     ?body_length:int64 ->
+    ?absolute_form:bool ->
     Code.meth ->
     Uri.t ->
     t
@@ -130,12 +128,9 @@ end
 
 module type Response = sig
   type t = {
-    encoding : Transfer.encoding;
-        [@deprecated "this field will be removed in the future"]
     headers : Header.t;  (** response HTTP headers *)
     version : Code.version;  (** (** HTTP version, usually 1.1 *) *)
     status : Code.status_code;  (** HTTP status code of the response *)
-    flush : bool; [@deprecated "this field will be removed in the future"]
   }
   [@@deriving sexp]
 
@@ -143,16 +138,11 @@ module type Response = sig
   val headers : t -> Header.t
   val version : t -> Code.version
   val status : t -> Code.status_code
-
-  val flush :
-    (t -> bool[@deprecated "this field will be removed in the future"])
-
   val compare : t -> t -> int
 
   val make :
     ?version:Code.version ->
     ?status:Code.status_code ->
-    ?flush:bool ->
     ?encoding:Transfer.encoding ->
     ?headers:Header.t ->
     unit ->

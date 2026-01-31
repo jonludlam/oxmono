@@ -20,6 +20,7 @@ end
 module type Net = sig
   module IO : IO
 
+  type client
   type endp
 
   type ctx [@@deriving sexp_of]
@@ -34,11 +35,13 @@ module type Net = sig
       installed on the system, [cohttp]/[conduit] tries the usual ([*:80]) or
       the specified port by the user in a non-secured way. *)
 
-  val default_ctx : ctx
+  val default_ctx : ctx Lazy.t
 
   val resolve : ctx:ctx -> Uri.t -> endp IO.t
   (** [resolve ~ctx uri] resolves [uri] into an endpoint description. This is
       [Resolver_lwt.resolve_uri ~uri ctx.resolver]. *)
+
+  val tunnel : string -> IO.ic * IO.oc -> client
 
   val connect_uri : ctx:ctx -> Uri.t -> (IO.conn * IO.ic * IO.oc) IO.t
   (** [connect_uri ~ctx uri] starts a {i flow} on the given [uri]. The choice of
@@ -62,6 +65,7 @@ module type Net = sig
   (** [connect_endp ~ctx endp] starts a {i flow} to the given [endp]. [endp]
       describes address and protocol of the endpoint to connect to. *)
 
+  val connect_client : ctx:ctx -> client -> (IO.conn * IO.ic * IO.oc) IO.t
   val close_in : IO.ic -> unit
   val close_out : IO.oc -> unit
   val close : IO.ic -> IO.oc -> unit
@@ -76,35 +80,34 @@ end
 type call =
   ?headers:Http.Header.t ->
   ?body:Body.t ->
+  ?absolute_form:bool ->
   Http.Method.t ->
   Uri.t ->
   (Cohttp.Response.t * Body.t) Lwt.t
-(** [call ?headers ?body method uri]
-    Function type used to handle http requests
+(** [call ?headers ?body method uri] Function type used to handle http requests
 
-    @return [(response, response_body)]
-    [response_body] is not buffered, but stays on the wire until
-    consumed. It must therefore be consumed in a timely manner.
-    Otherwise the connection would stay open and a file descriptor leak
-    may be caused. Following responses would get blocked.
-    Functions in the {!Body} module can be used to consume [response_body].
-    Use {!Body.drain_body} if you don't consume the body by other means.
+    @return
+      [(response, response_body)] [response_body] is not buffered, but stays on
+      the wire until consumed. It must therefore be consumed in a timely manner.
+      Otherwise the connection would stay open and a file descriptor leak may be
+      caused. Following responses would get blocked. Functions in the {!Body}
+      module can be used to consume [response_body]. Use {!Body.drain_body} if
+      you don't consume the body by other means.
 
-    Leaks are detected by the GC and logged as debug messages, these can
-    be enabled activating the debug logging. For example, this can be
-    done as follows in [cohttp-lwt-unix]
+    Leaks are detected by the GC and logged as debug messages, these can be
+    enabled activating the debug logging. For example, this can be done as
+    follows in [cohttp-lwt-unix]
 
     {[
       Cohttp_lwt_unix.Debug.activate_debug ();
       Logs.set_level (Some Logs.Warning)
     ]}
 
-    @raise {!exception Connection.Retry} on recoverable errors like the remote
-    endpoint closing
-    the connection gracefully. Even non-idempotent requests are
-    guaranteed to not have been processed by the remote endpoint and
-    should be retried. But beware that a [`Stream] [body] may have been
-    consumed. *)
+    @raise {!Connection.Retry}
+      on recoverable errors like the remote endpoint closing the connection
+      gracefully. Even non-idempotent requests are guaranteed to not have been
+      processed by the remote endpoint and should be retried. But beware that a
+      [`Stream] [body] may have been consumed. *)
 
 (** The [Connection] module handles a single, possibly pipelined, http
     connection. *)
@@ -133,11 +136,14 @@ module type Connection = sig
         closed as soon as possible. If [true], it is assumed the remote end does
         support pipelining and multiple requests may be sent even before
         receiving any reply. By default we wait for the first response to decide
-        whether connection keep-alive and pipelining is suppored. Chunked
+        whether connection keep-alive and pipelining is supported. Chunked
         encoding can only be used when pipelining is supported. Therefore better
         avoid using chunked encoding on the very first request.
       @param ctx See [Net.ctx]
       @param endp The remote address, port and protocol to connect to. *)
+
+  val create_tunnel :
+    ?finalise:(t -> unit Net.IO.t) -> ?ctx:Net.ctx -> t -> string -> t
 
   val connect :
     ?finalise:(t -> unit Net.IO.t) ->
@@ -187,14 +193,16 @@ end
 module type Client = sig
   type ctx
 
+  module IO : IO with type 'a t = 'a Lwt.t
+
   (** @param ctx
         If provided, no connection cache is used, but
         {!val:Connection_cache.Make_no_cache.create} is used to resolve uri and
         create a dedicated connection with [ctx].
 
-        In most cases you should use the more specific helper calls in the
-        interface rather than invoke this function directly. See {!head}, {!get}
-        and {!post} for some examples. *)
+      In most cases you should use the more specific helper calls in the
+      interface rather than invoke this function directly. See {!head}, {!get}
+      and {!post} for some examples. *)
   include
     Cohttp.Generic.Client.S
       with type 'a io = 'a Lwt.t
@@ -218,16 +226,21 @@ module type Client = sig
     Uri.t ->
     (Http.Request.t * Body.t) Lwt_stream.t ->
     (Http.Response.t * Body.t) Lwt_stream.t Lwt.t
-  (** @deprecated use {!module Cohttp_lwt.Connection} instead. *)
+  (** @deprecated use {!module:Cohttp_lwt.Connection} instead. *)
 end
 
 (** The [Server] module implements a pipelined HTTP/1.1 server. *)
 module type Server = sig
   module IO : IO
-  include Cohttp.Generic.Server.S with type body = Body.t and module IO := IO
+
+  include
+    Cohttp.Generic.Server.S
+      with type body = Body.t
+       and module IO := IO
+       and type response = Http.Response.t * Body.t
 
   val resolve_local_file : docroot:string -> uri:Uri.t -> string
-    [@@deprecated "Please use Cohttp.Path.resolve_local_file. "]
+  [@@deprecated "Please use Cohttp.Path.resolve_local_file. "]
   (** Resolve a URI and a docroot into a concrete local filename. *)
 
   val respond_error :

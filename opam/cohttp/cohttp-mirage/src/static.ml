@@ -14,7 +14,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * cohttp v6.0.0_beta2
+ * cohttp v6.2.1
  *)
 
 module Key = Mirage_kv.Key
@@ -24,7 +24,7 @@ module HTTP (FS : Mirage_kv.RO) (S : Cohttp_lwt.S.Server) = struct
   open Lwt.Infix
   open Astring
 
-  let failf fmt = Fmt.kstr Lwt.fail_with fmt
+  let failf fmt = Fmt.failwith fmt
 
   let read_fs t name =
     FS.get t (Key.v name) >>= function

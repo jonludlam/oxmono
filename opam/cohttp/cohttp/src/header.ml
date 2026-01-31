@@ -22,7 +22,7 @@ let media_type_re =
   let re = Re.Emacs.re ~case:true "[ \t]*\\([^ \t;]+\\)" in
   Re.(compile (seq [ start; re ]))
 
-let get_first_match _re s =
+let get_first_match s =
   try
     let subs = Re.exec ~pos:0 media_type_re s in
     let start, stop = Re.Group.offset subs 1 in
@@ -32,7 +32,7 @@ let get_first_match _re s =
 (* Grab "foo/bar" from " foo/bar ; charset=UTF-8" *)
 let get_media_type headers =
   match get headers "content-type" with
-  | Some s -> get_first_match media_type_re s
+  | Some s -> get_first_match s
   | None -> None
 
 let get_acceptable_media_ranges headers =
@@ -49,28 +49,6 @@ let get_acceptable_encodings headers =
 let get_acceptable_languages headers =
   Accept.languages
     (get_multi_concat ~list_value_only:true headers "accept-language")
-
-(* Parse the transfer-encoding and content-length headers to
- * determine how to decode a body *)
-let get_transfer_encoding headers =
-  (* It should actually be [get] as the interresting value is actually the last.*)
-  match get_multi_concat ~list_value_only:true headers "transfer-encoding" with
-  | Some "chunked" -> Transfer.Chunked
-  | Some _ | None -> (
-      match get_content_range headers with
-      | Some len -> Transfer.Fixed len
-      | None -> Transfer.Unknown)
-
-let add_transfer_encoding headers enc =
-  let open Transfer in
-  (* Only add a header if one doesnt already exist, e.g. from the app *)
-  match (get_transfer_encoding headers, enc) with
-  | Fixed _, _ (* App has supplied a content length, so use that *) | Chunked, _
-    ->
-      headers (* TODO: this is a protocol violation *)
-  | Unknown, Chunked -> add headers "transfer-encoding" "chunked"
-  | Unknown, Fixed len -> add headers "content-length" (Int64.to_string len)
-  | Unknown, Unknown -> headers
 
 let add_authorization_req headers challenge =
   add headers "www-authenticate" (Auth.string_of_challenge challenge)
@@ -107,13 +85,6 @@ let prepend_user_agent headers user_agent =
   match get headers k with
   | Some ua -> replace headers k (user_agent ^ " " ^ ua)
   | None -> add headers k user_agent
-
-let connection h =
-  match get h "connection" with
-  | Some v when v = "keep-alive" -> Some `Keep_alive
-  | Some v when v = "close" -> Some `Close
-  | Some x -> Some (`Unknown x)
-  | _ -> None
 
 open Sexplib0.Sexp_conv
 

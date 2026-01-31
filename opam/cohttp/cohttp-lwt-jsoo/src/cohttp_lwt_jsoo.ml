@@ -48,7 +48,16 @@ let string_of_uint8array u8a offset len =
   String.init len (fun i -> Char.chr (Typed_array.unsafe_get u8a (offset + i)))
 
 module String_io = Cohttp.Private.String_io
-module IO = Cohttp_lwt.Private.String_io
+
+module IO = struct
+  include Cohttp_lwt.Private.String_io
+
+  type error = |
+
+  let catch f = Lwt.map (fun v -> Result.Ok v) @@ f ()
+  let pp_error _ (e : error) = match e with _ -> .
+end
+
 module Header_io = Cohttp.Private.Header_io.Make (IO)
 
 module Body_builder (P : Params) = struct
@@ -63,11 +72,11 @@ module Body_builder (P : Params) = struct
     let chunkerizer () =
       if !pos = body_len then Lwt.return C.Transfer.Done
       else if !pos + P.chunk_size >= body_len then (
-        let str = text ## (substring_toEnd !pos) in
+        let str = text##(substring_toEnd !pos) in
         pos := body_len;
         Lwt.return (C.Transfer.Final_chunk (P.convert_body_string str)))
       else
-        let str = text ## (substring !pos (!pos + P.chunk_size)) in
+        let str = text##(substring !pos (!pos + P.chunk_size)) in
         pos := !pos + P.chunk_size;
         Lwt.return (C.Transfer.Chunk (P.convert_body_string str))
     in
@@ -141,6 +150,7 @@ module Make_api (X : sig
     (Response.t * Cohttp_lwt.Body.t) Lwt.t
 end) =
 struct
+  module IO = IO
   module Request = X.Request
   module Response = X.Response
 
@@ -188,7 +198,7 @@ struct
   (* No implementation (can it be done?).  What should the failure exception be? *)
   exception Cohttp_lwt_xhr_callv_not_implemented
 
-  let callv ?ctx:_ _uri _reqs = Lwt.fail Cohttp_lwt_xhr_callv_not_implemented
+  let callv ?ctx:_ _uri _reqs = raise Cohttp_lwt_xhr_callv_not_implemented
 
   (* ??? *)
 end
@@ -205,11 +215,10 @@ module Make_client_async (P : Params) = Make_api (struct
       xml##.responseType := Js.string "arraybuffer";
     let (res : (Http.Response.t Lwt.t * CLB.t) Lwt.t), wake = Lwt.task () in
     let () =
-      xml
-      ## (_open
-            (Js.string (C.Code.string_of_method meth))
-            (Js.string (Uri.to_string uri))
-            Js._true)
+      xml##(_open
+              (Js.string (C.Code.string_of_method meth))
+              (Js.string (Uri.to_string uri))
+              Js._true)
       (* asynchronous call *)
     in
     (* set request headers *)
@@ -221,7 +230,7 @@ module Make_client_async (P : Params) = Make_api (struct
             (fun k v ->
               (* some headers lead to errors in the javascript console, should
                  we filter then out here? *)
-              xml ## (setRequestHeader (Js.string k) (Js.string v)))
+              xml##(setRequestHeader (Js.string k) (Js.string v)))
             headers
     in
 
@@ -242,7 +251,6 @@ module Make_client_async (P : Params) = Make_api (struct
                     Header_io.parse channel >|= fun resp_headers ->
                     Cohttp.Response.make ~version:`HTTP_1_1
                       ~status:(C.Code.status_of_code xml##.status)
-                      ~flush:false (* ??? *)
                       ~encoding:(CLB.transfer_encoding body)
                       ~headers:resp_headers ())
                 in
@@ -250,7 +258,7 @@ module Make_client_async (P : Params) = Make_api (struct
               with
               | e
               (* If we exhaust the stack, it is possible that
-                 Lwt.wakeup just aboves marks the promise as
+                 Lwt.wakeup just above marks the promise as
                  completed, but raises Stack_overflow while
                  running the promise callbacks. In this case
                  waking calling wakeup_exn on the already
@@ -265,12 +273,12 @@ module Make_client_async (P : Params) = Make_api (struct
 
     (* perform call *)
     (match body with
-    | None -> Lwt.return xml ## (send Js.null)
+    | None -> Lwt.return xml##(send Js.null)
     | Some body ->
         CLB.to_string body >>= fun body ->
         let bs = binary_string body in
         (*Js.Opt.case (File.CoerceTo.blob (Obj.magic blob))
-          (fun () -> Lwt.fail_with "could not coerce to blob")
+          (fun () -> failwith "could not coerce to blob")
           (fun blob -> Lwt.return (xml##(send_blob blob)))*)
         (*Lwt.return (xml##send (Js.Opt.return bs)) *)
         Lwt.return (xml##send (Js.Opt.return (Obj.magic bs))))
@@ -293,11 +301,10 @@ module Make_client_sync (P : Params) = Make_api (struct
     if Lazy.force xhr_response_supported then
       xml##.responseType := Js.string "arraybuffer";
     let () =
-      xml
-      ## (_open
-            (Js.string (C.Code.string_of_method meth))
-            (Js.string (Uri.to_string uri))
-            Js._false)
+      xml##(_open
+              (Js.string (C.Code.string_of_method meth))
+              (Js.string (Uri.to_string uri))
+              Js._false)
       (* synchronous call *)
     in
     (* set request headers *)
@@ -309,16 +316,16 @@ module Make_client_sync (P : Params) = Make_api (struct
             (fun k v ->
               (* some headers lead to errors in the javascript console, should
                  we filter then out here? *)
-              xml ## (setRequestHeader (Js.string k) (Js.string v)))
+              xml##(setRequestHeader (Js.string k) (Js.string v)))
             headers
     in
     (* perform call *)
     (match body with
-    | None -> Lwt.return xml ## (send Js.null)
+    | None -> Lwt.return xml##(send Js.null)
     | Some body ->
         CLB.to_string body >|= fun body ->
         let bs = binary_string body in
-        xml ## (send (Js.Opt.return (Obj.magic bs))))
+        xml##(send (Js.Opt.return (Obj.magic bs))))
     >>= fun _body ->
     let body = Bb.construct_body xml in
     (* (re-)construct the response *)
@@ -327,7 +334,6 @@ module Make_client_sync (P : Params) = Make_api (struct
     let response =
       Response.make ~version:`HTTP_1_1
         ~status:(Cohttp.Code.status_of_code xml##.status)
-        ~flush:false
         ~encoding:(CLB.transfer_encoding body)
         ~headers:resp_headers ()
     in

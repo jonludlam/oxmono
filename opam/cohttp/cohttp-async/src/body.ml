@@ -20,19 +20,8 @@ let drain = function #B.t -> return () | `Pipe p -> Pipe.drain p
 
 let is_empty (body : t) =
   match body with
-  | #B.t as body -> return (B.is_empty body)
-  | `Pipe pipe -> (
-      Deferred.repeat_until_finished () @@ fun () ->
-      Pipe.values_available pipe >>= function
-      | `Eof -> return (`Finished true)
-      | `Ok -> (
-          match Pipe.peek pipe with
-          | None -> return (`Finished true)
-          | Some "" -> (
-              Pipe.read pipe >>| function
-              | `Eof -> `Finished true
-              | `Ok _ -> `Repeat ())
-          | Some _ -> return (`Finished false)))
+  | #B.t as body -> if B.is_empty body then `True else `False
+  | `Pipe _ -> `Unknown
 
 let to_pipe = function
   | `Empty -> Pipe.of_list []
@@ -52,7 +41,7 @@ let transfer_encoding = function
   | #B.t as t -> B.transfer_encoding t
   | `Pipe _ -> Cohttp.Transfer.Chunked
 
-let of_string_list strings = `Pipe (Pipe.of_list strings)
+let of_string_list strings = `Strings strings
 
 let map t ~f =
   match t with
@@ -71,11 +60,10 @@ let write_body write_body (body : t) writer =
   | `Pipe p -> Pipe.iter p ~f:(write_body writer)
 
 let pipe_of_body read_chunk ic =
-  let open Cohttp.Transfer in
   Pipe.create_reader ~close_on_exception:false (fun writer ->
       Deferred.repeat_until_finished () (fun () ->
           read_chunk ic >>= function
-          | Chunk buf ->
+          | Cohttp.Transfer.Chunk buf ->
               (* Even if [writer] has been closed, the loop must continue reading
                * from the input channel to ensure that it is left in a proper state
                * for the next request to be processed (in the case of keep-alive).

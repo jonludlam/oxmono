@@ -28,27 +28,27 @@ let server =
   ]
   (* pipelined_chunk *)
   @ (response_bodies |> List.map ~f:(Fn.compose const ok))
-  @ (* large response chunked *)
-  [
-    (fun _ _ ->
-      let body =
-        let r, w = Pipe.create () in
-        let chunk = chunk chunk_size in
-        for _ = 0 to chunks - 1 do
-          Pipe.write_without_pushback w chunk
-        done;
-        Pipe.close w;
-        r
-      in
-      Server.respond_with_pipe ~code:`OK body >>| response);
-    (* pipelined_expert *)
-    expert (fun _ic oc ->
-        Async_unix.Writer.write oc "8\r\nexpert 1\r\n0\r\n\r\n";
-        Async_unix.Writer.flushed oc);
-    expert (fun ic oc ->
-        Async_unix.Writer.write oc "8\r\nexpert 2\r\n0\r\n\r\n";
-        Async_unix.Writer.flushed oc >>= fun () -> Async_unix.Reader.close ic);
-  ]
+  (* large response chunked *)
+  @ [
+      (fun _ _ ->
+        let body =
+          let r, w = Pipe.create () in
+          let chunk = chunk chunk_size in
+          for _ = 0 to chunks - 1 do
+            Pipe.write_without_pushback w chunk
+          done;
+          Pipe.close w;
+          r
+        in
+        Server.respond_with_pipe ~code:`OK body >>| response);
+      (* pipelined_expert *)
+      expert (fun _ic oc ->
+          Async_unix.Writer.write oc "8\r\nexpert 1\r\n0\r\n\r\n";
+          Async_unix.Writer.flushed oc);
+      expert (fun ic oc ->
+          Async_unix.Writer.write oc "8\r\nexpert 2\r\n0\r\n\r\n";
+          Async_unix.Writer.flushed oc >>= fun () -> Async_unix.Reader.close ic);
+    ]
   |> response_sequence
 
 let ts =
@@ -101,31 +101,6 @@ let ts =
         Body.to_string body >>| fun body ->
         assert_equal ~printer "expert 2" body
       in
-      let check_body_empty_status () =
-        let is_empty = Cohttp_async.Body.is_empty in
-        let tests =
-          [
-            ("empty pipe", Pipe.of_list [], true);
-            ("pipe with elements", Pipe.of_list [ "foo"; "bar" ], false);
-            ( "pipe with empty items at the beginning",
-              Pipe.of_list [ ""; "baz" ],
-              false );
-            ("Pipe with empty strings", Pipe.of_list [ ""; ""; "" ], true);
-          ]
-        in
-        Deferred.List.iter ~how:`Sequential tests
-          ~f:(fun (msg, pipe, expected) ->
-            is_empty (`Pipe pipe) >>| fun real ->
-            assert_equal ~msg expected real)
-        >>= fun () ->
-        let b = Pipe.of_list [ ""; ""; "foo"; "bar" ] in
-        is_empty (`Pipe b) >>= fun _ ->
-        Pipe.to_list b >>| fun real ->
-        let msg =
-          "Checking if pipe is empty consumes all leading empty strings"
-        in
-        assert_equal ~msg [ "foo"; "bar" ] real
-      in
       [
         ("empty chunk test", empty_chunk);
         ("large response", large_response);
@@ -133,7 +108,6 @@ let ts =
         ("pipelined chunk test", pipelined_chunk);
         ("large chunked response", large_chunked_response);
         ("expert response", expert_pipelined);
-        ("check body is_empty status for pipes", check_body_empty_status);
       ])
 
 let () =

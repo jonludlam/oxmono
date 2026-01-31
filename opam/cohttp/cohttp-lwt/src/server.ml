@@ -7,6 +7,7 @@ module Make (IO : S.IO) = struct
   module Request = Make.Request (IO)
   module Response = Make.Response (IO)
 
+  type response = Http.Response.t * Body.t
   type body = Body.t
 
   let src = Logs.Src.create "cohttp.lwt.server" ~doc:"Cohttp Lwt server module"
@@ -44,7 +45,7 @@ module Make (IO : S.IO) = struct
   let resolve_local_file ~docroot ~uri =
     Cohttp.Path.resolve_local_file ~docroot ~uri
 
-  let respond ?headers ?(flush = true) ~status ~body () =
+  let respond ?headers ~status ~body () =
     let encoding =
       match headers with
       | None -> Body.transfer_encoding body
@@ -53,12 +54,12 @@ module Make (IO : S.IO) = struct
           | Http.Transfer.Unknown -> Body.transfer_encoding body
           | t -> t)
     in
-    let res = Response.make ~status ~flush ~encoding ?headers () in
+    let res = Response.make ~status ~encoding ?headers () in
     Lwt.return (res, body)
 
-  let respond_string ?headers ?(flush = true) ~status ~body () =
+  let respond_string ?headers ~status ~body () =
     let res =
-      Response.make ~status ~flush
+      Response.make ~status
         ~encoding:(Http.Transfer.Fixed (Int64.of_int (String.length body)))
         ?headers ()
     in
@@ -104,7 +105,7 @@ module Make (IO : S.IO) = struct
         Lwt.catch
           (fun () -> callback conn req body)
           (function
-            | Out_of_memory -> Lwt.fail Out_of_memory
+            | Out_of_memory -> Lwt.reraise Out_of_memory
             | exn ->
                 Log.err (fun f ->
                     f "Error handling %a: %s" Request.pp_hum req
@@ -115,8 +116,7 @@ module Make (IO : S.IO) = struct
 
   let handle_response ~keep_alive oc res body conn_closed handle_client =
     IO.catch (fun () ->
-        let flush = Response.flush res in
-        Response.write ~flush
+        Response.write ~flush:false
           (fun writer -> Body.write_body (Response.write_body writer) body)
           res oc)
     >>= function
@@ -146,6 +146,15 @@ module Make (IO : S.IO) = struct
             let keep_alive =
               Http.Request.is_keep_alive req && Http.Response.is_keep_alive res
             in
+            let res =
+              let headers =
+                Http.Header.add_unless_exists
+                  (Http.Response.headers res)
+                  "connection"
+                  (if keep_alive then "keep-alive" else "close")
+              in
+              { res with Http.Response.headers }
+            in
             handle_response ~keep_alive oc res body
               (fun () -> spec.conn_closed conn)
               (fun oc -> handle_client ic oc conn spec)
@@ -168,5 +177,5 @@ module Make (IO : S.IO) = struct
             Lwt.return_unit)
       (fun e ->
         conn_closed ();
-        Lwt.fail e)
+        Lwt.reraise e)
 end

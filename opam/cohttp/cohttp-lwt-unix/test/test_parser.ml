@@ -221,7 +221,7 @@ let res_content_parse () =
       Rep_io.read_body_chunk reader >>= fun body ->
       assert_equal
         ~printer:(fun chunk ->
-          Transfer.sexp_of_chunk chunk |> Sexplib.Sexp.to_string_hum)
+          Transfer.sexp_of_chunk chunk |> Sexplib0.Sexp.to_string_hum)
         (Transfer.Final_chunk "home=Cosby&favorite+flavor=flies") body;
       return ()
   | _ -> assert false
@@ -254,7 +254,7 @@ let write_req expected req =
   let buf = Lwt_bytes.create 4096 in
   let oc = oc_of_buffer buf in
   let body = Cohttp_lwt.Body.of_string "foobar" in
-  Req_io.write
+  Req_io.write ~flush:false
     (fun writer -> Cohttp_lwt.Body.write_body (Req_io.write_body writer) body)
     req oc
   >>= fun () ->
@@ -263,7 +263,9 @@ let write_req expected req =
    * by re-using it *)
   let buf = Lwt_bytes.create 4096 in
   let oc = oc_of_buffer buf in
-  Req_io.write (fun writer -> Req_io.write_body writer "foobar") req oc
+  Req_io.write ~flush:false
+    (fun writer -> Req_io.write_body writer "foobar")
+    req oc
   >|= fun () -> assert_equal expected (get_substring oc buf)
 
 let make_simple_req () =
@@ -315,7 +317,7 @@ let make_simple_res () =
   let oc = oc_of_buffer buf in
   let res = Response.make ~headers:(Header.of_list [ ("foo", "bar") ]) () in
   let body = Cohttp_lwt.Body.of_string "foobar" in
-  Rep_io.write
+  Rep_io.write ~flush:false
     (fun writer -> Cohttp_lwt.Body.write_body (Rep_io.write_body writer) body)
     res oc
   >>= fun () ->
@@ -324,7 +326,9 @@ let make_simple_res () =
    * by re-using it *)
   let buf = Lwt_bytes.create 4096 in
   let oc = oc_of_buffer buf in
-  Rep_io.write (fun writer -> Rep_io.write_body writer "foobar") res oc
+  Rep_io.write ~flush:false
+    (fun writer -> Rep_io.write_body writer "foobar")
+    res oc
   >>= fun () ->
   assert_equal expected (get_substring oc buf);
   return ()
@@ -349,7 +353,7 @@ let test_cases =
   List.map (fun (n, x) -> n >:: fun () -> Lwt_main.run (x ())) tests
 
 (* Returns true if the result list contains successes only.
-   Copied from oUnit source as it isnt exposed by the mli *)
+   Copied from ounit2 source as it isn't exposed by the mli *)
 let rec was_successful = function
   | [] -> true
   | RSuccess _ :: t | RSkip _ :: t -> was_successful t

@@ -23,6 +23,14 @@ let client uri ofile meth' =
   let* resp, response_body =
     Lwt.both (Curl.Response.response reply) (Curl.Response.body reply)
   in
+  let resp, response_body =
+    match (resp, response_body) with
+    | Ok _, Error _ | Error _, Ok _ -> assert false
+    | Ok x, Ok y -> (x, y)
+    | Error _, Error e ->
+        Format.eprintf "error: %s@.%!" (Curl.Error.message e);
+        exit 1
+  in
   Format.eprintf "response:%a@.%!" Sexp.pp_hum (Response.sexp_of_t resp);
   let status = Response.status resp in
   Log.debug (fun d ->
@@ -49,11 +57,14 @@ let run_client level ofile uri meth =
 open Cmdliner
 
 let uri =
-  let loc : Uri.t Arg.conv =
-    let parse s =
-      try `Ok (Uri.of_string s) with Failure _ -> `Error "unable to parse URI"
+  let loc =
+    let parser s =
+      match Uri.of_string s with
+      | uri -> Ok uri
+      | exception Failure _ -> Error "unable to parse URI"
     in
-    (parse, fun ppf p -> Format.fprintf ppf "%s" (Uri.to_string p))
+    let pp ppf u = Format.fprintf ppf "%s" (Uri.to_string u) in
+    Cmdliner.Arg.Conv.make ~parser ~pp ~docv:"URI" ()
   in
   Arg.(
     required

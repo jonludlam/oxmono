@@ -60,7 +60,7 @@ let request ?interrupt ?ssl_config ?uri ?(body = `Empty) req =
   let uri = match uri with Some t -> t | None -> Cohttp.Request.uri req in
   Net.connect_uri ?interrupt ?ssl_config uri >>= fun (ic, oc) ->
   try_with (fun () ->
-      Io.Request.write
+      Io.Request.write ~flush:false
         (fun writer ->
           Body.Private.write_body Io.Request.write_body body writer)
         req oc
@@ -98,18 +98,19 @@ module Connection = struct
     Throttle.kill t;
     Throttle.cleaned t
 
+  let close_finished t = Throttle.cleaned t
   let is_closed t = Throttle.is_dead t
 
   let request ?(body = Body.empty) t req =
     let res = Ivar.create () in
     Throttle.enqueue t (fun { ic; oc } ->
-        Io.Request.write
+        Io.Request.write ~flush:false
           (fun writer ->
             Body.Private.write_body Io.Request.write_body body writer)
           req oc
         >>= fun () ->
         read_response ic >>= fun (resp, body) ->
-        Ivar.fill res (resp, `Pipe body);
+        Ivar.fill_exn res (resp, `Pipe body);
         (* block starting any more requests until the consumer has finished reading this request *)
         Pipe.closed body)
     |> don't_wait_for;
@@ -137,17 +138,18 @@ let call ?interrupt ?ssl_config ?headers ?(chunked = false) ?(body = `Empty)
       Body.Private.disable_chunked_encoding body >>| fun (body, body_length) ->
       ( Cohttp.Request.make_for_client ?headers ~chunked ~body_length meth uri,
         body )
-  | true -> (
-      Body.is_empty body >>| function
-      | true ->
-          (* Don't used chunked encoding with an empty body *)
-          ( Cohttp.Request.make_for_client ?headers ~chunked:false
-              ~body_length:0L meth uri,
-            body )
-      | false ->
-          (* Use chunked encoding if there is a body *)
-          (Cohttp.Request.make_for_client ?headers ~chunked:true meth uri, body)
-      ))
+  | true ->
+      Deferred.return
+        (match Body.is_empty body with
+        | `True ->
+            (* Don't used chunked encoding with an empty body *)
+            ( Cohttp.Request.make_for_client ?headers ~chunked:false
+                ~body_length:0L meth uri,
+              body )
+        | `Unknown | `False ->
+            (* Use chunked encoding if there is a body *)
+            ( Cohttp.Request.make_for_client ?headers ~chunked:true meth uri,
+              body )))
   >>= fun (req, body) -> request ?interrupt ?ssl_config ~body ~uri req
 
 let get ?interrupt ?ssl_config ?headers uri =

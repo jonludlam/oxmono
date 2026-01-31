@@ -25,7 +25,7 @@ module Header = struct
       else
         let len = String.length a in
         len = String.length b
-        (* Note: at this point we konw that [a] and [b] have the same length. *)
+        (* Note: at this point we know that [a] and [b] have the same length. *)
         &&
         (* [word_loop a b i len] compares strings [a] and [b] from
            offsets [i] (included) to [len] (excluded), one word at a time.
@@ -312,7 +312,7 @@ module Header = struct
   (* Parse the transfer-encoding and content-length headers to
    * determine how to decode a body *)
   let get_transfer_encoding headers =
-    (* It should actually be [get] as the interresting value is actually the last.*)
+    (* It should actually be [get] as the interesting value is actually the last.*)
     match
       get_multi_concat ~list_value_only:true headers "transfer-encoding"
     with
@@ -322,9 +322,8 @@ module Header = struct
         | Some len -> Transfer.Fixed len
         | None -> Transfer.Unknown)
 
-  let add_transfer_encoding headers enc =
-    let open Transfer in
-    (* Only add a header if one doesnt already exist, e.g. from the app *)
+  let add_transfer_encoding headers (enc : Transfer.encoding) =
+    (* Only add a header if one doesn't already exist, e.g. from the app *)
     match (get_transfer_encoding headers, enc) with
     | Fixed _, _ (* App has supplied a content length, so use that *)
     | Chunked, _ ->
@@ -740,32 +739,22 @@ module Request = struct
   type t = {
     headers : Header.t;  (** HTTP request headers *)
     meth : Method.t;  (** HTTP request method *)
-    scheme : string option;  (** URI scheme (http or https) *)
     resource : string;  (** Request path and query *)
     version : Version.t;  (** HTTP version, usually 1.1 *)
-    encoding : Transfer.encoding;
   }
 
   let headers t = t.headers
   let meth t = t.meth
-  let scheme t = t.scheme
   let resource t = t.resource
   let version t = t.version
-  let encoding t = t.encoding
 
-  let compare { headers; meth; scheme; resource; version; encoding } y =
+  let compare { headers; meth; resource; version } y =
     match Header.compare headers y.headers with
     | 0 -> (
         match Method.compare meth y.meth with
         | 0 -> (
-            match Option.compare String.compare scheme y.scheme with
-            | 0 -> (
-                match String.compare resource y.resource with
-                | 0 -> (
-                    match Version.compare version y.version with
-                    | 0 -> Transfer.compare_encoding encoding y.encoding
-                    | i -> i)
-                | i -> i)
+            match String.compare resource y.resource with
+            | 0 -> Version.compare version y.version
             | i -> i)
         | i -> i)
     | i -> i
@@ -787,12 +776,13 @@ module Request = struct
 
   (* Defined for method types in RFC7231 *)
   let has_body req =
-    if Method.body_allowed req.meth then Transfer.has_body req.encoding else `No
+    if Method.body_allowed req.meth then
+      Transfer.has_body (Header.get_transfer_encoding req.headers)
+    else `No
 
   let make ?(meth = `GET) ?(version = `HTTP_1_1) ?(headers = Header.empty)
-      ?scheme resource =
-    let encoding = Header.get_transfer_encoding headers in
-    { headers; meth; scheme; resource; version; encoding }
+      resource =
+    { headers; meth; resource; version }
 
   let pp fmt t =
     let open Format in
@@ -809,37 +799,28 @@ end
 
 module Response = struct
   type t = {
-    encoding : Transfer.encoding;
     headers : Header.t;  (** response HTTP headers *)
     version : Version.t;  (** (** HTTP version, usually 1.1 *) *)
     status : Status.t;  (** HTTP status code of the response *)
-    flush : bool;
   }
 
-  let compare { headers; flush; version; encoding; status } y =
+  let compare { headers; version; status } y =
     match Header.compare headers y.headers with
     | 0 -> (
-        match Bool.compare flush y.flush with
+        match Stdlib.compare status y.status with
         | 0 -> (
             match Stdlib.compare status y.status with
-            | 0 -> (
-                match Version.compare version y.version with
-                | 0 -> Transfer.compare_encoding encoding y.encoding
-                | i -> i)
+            | 0 -> Version.compare version y.version
             | i -> i)
         | i -> i)
     | i -> i
 
-  let make ?(version = `HTTP_1_1) ?(status = `OK) ?(flush = false)
-      ?(headers = Header.empty) () =
-    let encoding = Header.get_transfer_encoding headers in
-    { encoding; headers; version; flush; status }
+  let make ?(version = `HTTP_1_1) ?(status = `OK) ?(headers = Header.empty) () =
+    { headers; version; status }
 
   let headers t = t.headers
-  let encoding t = t.encoding
   let version t = t.version
   let status t = t.status
-  let flush t = t.flush
   let is_keep_alive { version; headers; _ } = is_keep_alive version headers
 
   let requires_content_length ?request_meth t =
@@ -944,7 +925,7 @@ module Parser = struct
              "Http_parser.Source.substring: Index out of bounds., Requested \
               off: %d, len: %d"
              pos len);
-      let last = ref (t.pos + len - 1) in
+      let last = ref (t.pos + pos + len - 1) in
       let pos = ref (t.pos + pos) in
       while is_space (String.unsafe_get t.buffer !pos) do
         incr pos
@@ -953,7 +934,7 @@ module Parser = struct
         decr last
       done;
       let len = !last - !pos + 1 in
-      String.sub t.buffer !pos len
+      if len < 0 then "" else String.sub t.buffer !pos len
 
     let rec index_rec t ch idx len =
       if idx = len then -1
@@ -1147,14 +1128,7 @@ module Parser = struct
     let path = token source in
     let version = version source in
     let headers = headers source in
-    {
-      Request.headers;
-      meth;
-      scheme = None;
-      resource = path;
-      version;
-      encoding = Header.get_transfer_encoding headers;
-    }
+    { Request.headers; meth; resource = path; version }
 
   type error = Partial | Msg of string
 

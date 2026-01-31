@@ -14,15 +14,11 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * cohttp v6.0.0_beta2
+ * cohttp v6.2.1
  *)
 
-module Make
-    (P : Mirage_clock.PCLOCK)
-    (R : Resolver_mirage.S)
-    (S : Conduit_mirage.S) =
-struct
-  module Net = Net.Make (P) (R) (S)
+module Make (R : Resolver_mirage.S) (S : Conduit_mirage.S) = struct
+  module Net = Net.Make (R) (S)
   module Connection = Cohttp_lwt.Connection.Make (Net)
   include Cohttp_lwt.Client.Make (Connection)
 

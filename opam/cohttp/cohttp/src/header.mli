@@ -40,7 +40,8 @@ val to_list : t -> (string * string) list
 (** [to_list h] converts HTTP headers [h] to a list. Order and case is
     preserved.
 
-    {e Invariant (with case insensitive comparison):} [to_list (of_list l) = l] *)
+    {e Invariant (with case insensitive comparison):} [to_list (of_list l) = l]
+*)
 
 val init_with : string -> string -> t
 (** [init_with k v] construct a fresh HTTP headers with a single header with
@@ -85,9 +86,10 @@ val remove : t -> string -> t
 
 val replace : t -> string -> string -> t
 (** [replace h k v] replaces the last added value of [k] from [h] and removed
-    all other occurences of [k] if it exists. Otherwise it adds [(k, v)] to [h].
+    all other occurrences of [k] if it exists. Otherwise it adds [(k, v)] to
+    [h].
 
-    {e Invariant:} [forall h, k, v. get_multi (replace h k v) = \[ v \]] *)
+    {e Invariant:} [forall h, k, v. get_multi (replace h k v) = [ v ]] *)
 
 val mem : t -> string -> bool
 (** [mem h k] returns [true] if the header name [k] appears in [h] and [false]
@@ -117,14 +119,15 @@ val get_multi_concat : ?list_value_only:bool -> t -> string -> string option
     the last value paired with [k] in [h].
 
     {e Invariant:}
-    [forall h, k not a list-value header. get_multi_concat ~list-value-only:true h k = get h k] *)
+    [forall h, k not a list-value header. get_multi_concat ~list-value-only:true
+     h k = get h k] *)
 
 val update : t -> string -> (string option -> string option) -> t
 (** [update h k f] returns an header list containing the same headers as [h],
     except for the header name [k]. Depending on the value of [v] where [v] is
     [f (get h k)], the header pair [(k, v)] is added, removed or updated.
 
-    - If [v] is [None], the last occurence of [k] in [h] is removed;
+    - If [v] is [None], the last occurrence of [k] in [h] is removed;
 
     - If [v] is [Some w] then the last value paired with [k] in [h] is replaced
       by [w] if it exists. Otherwise, the pair [(k, w)] is added;
@@ -138,7 +141,7 @@ val update_all : t -> string -> (string list -> string list) -> t
     [vs] is [f (get_multi h k)], the values associated to the header [k] are
     added, removed or updated.
 
-    - If [vs] is an empty list, every occurences of the header [k] in [h] are
+    - If [vs] is an empty list, every occurrences of the header [k] in [h] are
       removed;
 
     - If [vs] is a non-empty list, all values previously associated to [k] are
@@ -152,7 +155,7 @@ val map : (string -> string -> string) -> t -> t
 val fold : (string -> string -> 'a -> 'a) -> t -> 'a -> 'a
 
 val to_lines : t -> string list
-(** [to_lines h] returns header fieds as a list of lines. Beware that each line
+(** [to_lines h] returns header fields as a list of lines. Beware that each line
     ends with "\r\n" characters. *)
 
 val to_frames : t -> string list
@@ -189,7 +192,8 @@ val clean_dup : t -> t
 
     Finally, following
     {{:https://tools.ietf.org/html/rfc7230#section-3.2.2} RFC7230§3.2.2}, the
-    header [Set-cookie] is treated as an exception and ignored by [clean_dup]. *)
+    header [Set-cookie] is treated as an exception and ignored by [clean_dup].
+*)
 
 val get_content_range : t -> Int64.t option
 val get_media_type : t -> string option
@@ -212,7 +216,8 @@ val add_links : t -> Link.t list -> t
 val get_links : t -> Link.t list
 
 val user_agent : string
-(** The User-Agent header used by this library, including the version of cohttp. *)
+(** The User-Agent header used by this library, including the version of cohttp.
+*)
 
 val prepend_user_agent : t -> string -> t
 (** Prepend [user_agent] to the product token already declared in the

@@ -1,13 +1,54 @@
+## v6.2.1 (2025-12-16)
+
+- cohttp: Fix syntax in forward proxy tests to recover compatibility with OCaml
+  4.08 to 4.12, fixing a regression introduced in v6.2.0. (@shonfeder, #1135)
+
+## v6.2.0 (2025-12-02)
+
+- cohttp-eio: Add support for forward proxies to the client (@shonfeder,  #1126)
+- cohttp-lwt: Expose the IO module, allowing IO errors to be handled (@mefyl, #1118)
+
+## v6.1.1 (2025-05-28)
+
+- cohttp-mirage: make client usable again -- this fixes a regression introduced
+  by #1080 (@Firobe, review by @edwintorok, #1110)
+- rename main function on README example (@Unn4m3DD, #1097)
+
+## v6.1.0 (2025-03-03)
+
+- cohttp-lwt-unix: Add http/https proxy support for client requests (@art-w @MisterDA, #1080)
+- cohttp-mirage: Support conduit 8.0.0 (@hannesm, #1104)
+
+## v6.0.0 (2024-11-21)
+
+- bump minimum dune version to 3.8 (@avsm)
+- cohttp-eio: Use system authenticator in example.
+- http, cohttp: remove the scheme field from requests. This means that
+  [Request.uri] no longer returns the same URI as was to create the request
+  with [Request.make] (@rgrinberg 1086)
+- cohttp-eio: Remove unused `Client_intf` module (talex5 #1081)
+- cohttp-eio: Make server response type abstract and allow streaming in cohttp-eio (talex5 #1024)
+- cohttp-{lwt,eio}: server: add connection header to response if not present (ushitora-anqou #1025)
+- cohttp-curl: Curl no longer prepends the first HTTP request header to the output. (jonahbeckford #1030, #987)
+- cohttp-eio: client: use permissive argument type for make_generic
+- cohttp-eio: Improve error handling in example server (talex5 #1023)
+- cohttp-eio: Don't blow up `Server.callback` on client disconnections. (mefyl #1015)
+- http: Fix assertion in `Source.to_string_trim` when `pos <> 0` (mefyl #1017)
+- cohttp: `Cohttp.Request.make_for_client` no longer allows setting both
+  `~chunked:true` and `~body_length`.
+- cohttp-lwt-unix: Don't blow up when certificates are not available and no-network requests are made. (akuhlens #1027)
+  + Makes `cohttp-lwt.S.default_ctx` lazy.
+
 ## v6.0.0~beta2 (2024-01-05)
 
-- cohttp-eio: Don't blow up Server on client disconnections. (mefyl #1011)
+- cohttp-eio: Don't blow up `Server.run` on client disconnections. (mefyl #1011)
 - cohttp-eio: Match body encoding with headers. (mefyl #1012)
 - cohttp-lwt: Preserve extended `Server.S.IO` signature. (mefyl #1013)
 
 ## v6.0.0~beta1 (2023-10-27)
 - cohttp-eio: move new Cohttp.{Client,Server} modules under Cohttp.Generic (mseri #1003)
 - cohttp-eio: Add Client.make_generic and HTTPS support. (talex5 #1002)
-- cohttp: move generic client and server signatures to cohttp and use them across all packges. (mefyl #984)
+- cohttp: move generic client and server signatures to cohttp and use them across all packages. (mefyl #984)
 - cohttp-eio: Complete rewrite to follow common interfaces and behaviors. (mefyl #984)
 
 ## v6.0.0~alpha2 (2023-08-08)
@@ -129,7 +170,7 @@
   **Breaking** the headers are no-longer lowercased when parsed, the headers key comparison is case insensitive instead.
 
 - cohttp-lwt-unix: Adopt ocaml-conduit 5.0.0 (smorimoto #787)
-  **Breaking** `Conduit_lwt_unix.connect`'s `ctx` param type chaged from `ctx` to  `ctx Lazy.t`
+  **Breaking** `Conduit_lwt_unix.connect`'s `ctx` param type changed from `ctx` to  `ctx Lazy.t`
 
 - cohttp-mirage: fix deprecated fmt usage (tmcgilchrist #783)
 - lwt_jsoo: Use logs for the warnings and document it (mseri #776)
@@ -149,7 +190,7 @@
 - Use implicit executable dependency for generate.exe (TheLortex #735)
 - cohttp: fix chunked encoding of empty body (mefyl #715)
 - cohttp-async: fix body not being uploaded with unchunked Async.Pipe (mefyl #706)
-- cohttp-{async, lwt}: fix suprising behaviours of Body.is_empty (anuragsoni #714 #712 #713)
+- cohttp-{async, lwt}: fix surprising behaviours of Body.is_empty (anuragsoni #714 #712 #713)
 - refactoring of tests (mseri #709, dinosaure #692)
 - update documentation (dinosaure #716, mseri #720)
 - fix deadlock in logging (dinosaure #722)
@@ -261,7 +302,7 @@ Async: Expert response action no longer writes empty HTTP body (#647 by andreas)
 
 In cohttp.0.99, a number of subpackages were turned into explicit
 opam packages to simplify dependency management.
-To aid migration, some compatability shims were left in place so that
+To aid migration, some compatibility shims were left in place so that
 the old findlib names would continue to work. They have now been removed
 as of this release.  If you were still using them, then please rename
 them as follows:
@@ -368,7 +409,7 @@ and avsm.
 
 ## 0.22.0 (2017-03-09)
 
-* Lwt: ensure conn_closed is cosed once client goes away (#528)
+* Lwt: ensure conn_closed is closed once client goes away (#528)
 * Use the Logs library for logging. (#532)
 
 ## 0.21.1 (2017-02-18)

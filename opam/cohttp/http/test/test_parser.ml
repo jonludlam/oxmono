@@ -15,6 +15,7 @@ let req =
    Cookie: wp_ozh_wsa_visits=2; wp_ozh_wsa_visit_lasttime=xxxxxxxxxx; \
    __utma=xxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.x; \
    __utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral\r\n\
+   Empty:    \r\n\
    \r\n"
 
 let assert_req_success ~here ~expected_req ~expected_consumed ?pos ?len buf =
@@ -36,16 +37,8 @@ let assert_req_success ~here ~expected_req ~expected_consumed ?pos ?len buf =
     (Http.Header.to_list @@ Http.Request.headers req);
   [%test_result: int] ~here ~expect:expected_consumed consumed
 
-let[@warning "-3"] make_req ~headers ?(encoding = Http.Transfer.Fixed 0L) meth
-    resource =
-  {
-    Http.Request.headers;
-    meth;
-    resource;
-    scheme = None;
-    encoding;
-    version = `HTTP_1_1;
-  }
+let[@warning "-3"] make_req ~headers meth resource =
+  { Http.Request.headers; meth; resource; version = `HTTP_1_1 }
 
 let req_expected =
   make_req
@@ -69,13 +62,14 @@ let req_expected =
               __utma=xxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.xxxxxxxxxx.x; \
               __utmz=xxxxxxxxx.xxxxxxxxxx.x.x.utmccn=(referral)|utmcsr=reader.livedoor.com|utmcct=/reader/|utmcmd=referral"
            );
+           ("Empty", "");
          ])
     `GET "/wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg"
 
 let parse_single_request () =
   assert_req_success
     ~here:[ [%here] ]
-    ~expected_req:req_expected ~expected_consumed:706 req
+    ~expected_req:req_expected ~expected_consumed:718 req
 
 let reject_headers_with_space_before_colon () =
   let req =
@@ -168,6 +162,26 @@ let parse_result_notifies_start_of_body () =
   [%test_result: string] ~expect:"foobar"
     (String.sub buf ~pos:count ~len:(String.length buf - count))
 
+let parse_proxy_get () =
+  let buf =
+    "GET http://example.com/foo.html HTTP/1.1\r\n\
+     Host: example.com\r\n\
+     Proxy-Authorization: Basic dXNlcjpwYXNz\r\n\
+     \r\n\
+     foobar"
+  in
+  let expected_req =
+    make_req
+      ~headers:
+        (Http.Header.of_list
+           [
+             ("Host", "example.com");
+             ("Proxy-Authorization", "Basic dXNlcjpwYXNz");
+           ])
+      `GET "http://example.com/foo.html"
+  in
+  assert_req_success ~here:[ [%here] ] ~expected_req ~expected_consumed:104 buf
+
 open Base_quickcheck
 
 let parse_chunk_length () =
@@ -256,6 +270,7 @@ let () =
           test_case "validate http version" `Quick validate_http_version;
           test_case "parse result notified offset of start of optional body"
             `Quick parse_result_notifies_start_of_body;
+          test_case "parse a proxy GET request" `Quick parse_proxy_get;
         ] );
       ( "chunked encoding",
         [

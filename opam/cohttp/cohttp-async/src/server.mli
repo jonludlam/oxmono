@@ -11,7 +11,6 @@ val num_connections : (_, _) t -> int
 type response = Http.Response.t * Body.t [@@deriving sexp_of]
 
 type 'r respond_t =
-  ?flush:bool ->
   ?headers:Http.Header.t ->
   ?body:Body.t ->
   Http.Status.t ->
@@ -32,17 +31,16 @@ type response_action =
       underlying {!Async_unix.Reader.t} and {!Async_unix.Writer.t}, which allows
       writing a response body more efficiently, stream a response or to switch
       protocols entirely (e.g. websockets). Processing of pipelined requests
-      continue after the {!unit Async_kernel.Deferred.t} is resolved. The
+      continue after the [unit Async_kernel.Deferred.t] is resolved. The
       connection can be closed by closing the {!Async_unix.Reader.t}. *)
 
 val respond : response respond_t
 
 val resolve_local_file : docroot:string -> uri:Uri.t -> string
-  [@@deprecated "Please use Cohttp.Path.resolve_local_file. "]
+[@@deprecated "Please use Cohttp.Path.resolve_local_file. "]
 (** Resolve a URI and a docroot into a concrete local filename. *)
 
 val respond_with_pipe :
-  ?flush:bool ->
   ?headers:Http.Header.t ->
   ?code:Http.Status.t ->
   string Async_kernel.Pipe.Reader.t ->
@@ -53,7 +51,6 @@ val respond_with_pipe :
     @param code Default is HTTP 200 `OK *)
 
 val respond_string :
-  ?flush:bool ->
   ?headers:Http.Header.t ->
   ?status:Http.Status.t ->
   string ->
@@ -66,7 +63,6 @@ val respond_with_redirect :
     @param uri Absolute URI to redirect the client to *)
 
 val respond_with_file :
-  ?flush:bool ->
   ?headers:Http.Header.t ->
   ?error_body:string ->
   string ->

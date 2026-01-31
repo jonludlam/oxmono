@@ -11,13 +11,15 @@
   (pps ppx_sexp_conv))
  (libraries
   base64
+  ipaddr
   logs
   (re_export http)
   re
   sexplib0
   stringext
   uri
-  uri-sexp))
+  uri-sexp
+  uri.services))
 
 (ocamllex accept_lexer)
 

@@ -14,7 +14,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * cohttp v6.0.0_beta2
+ * cohttp v6.2.1
  *)
 
 (** Cohttp IO implementation using Mirage channels. *)

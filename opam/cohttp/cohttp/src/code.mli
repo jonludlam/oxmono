@@ -35,7 +35,7 @@ type success_status =
   | `Partial_content  (** partial resource return due to request header *)
   | `Multi_status  (** XML, can contain multiple separate responses *)
   | `Already_reported  (** results previously returned *)
-  | `Im_used  (** request fulfilled, reponse is instance-manipulations *) ]
+  | `Im_used  (** request fulfilled, response is instance-manipulations *) ]
 [@@deriving sexp]
 (** Success *)
 
@@ -171,7 +171,8 @@ val reason_phrase_of_code : int -> string
 (** Give a description of the given int code. *)
 
 val is_informational : int -> bool
-(** Is the given int code belong to the class of "informational" return code ? *)
+(** Is the given int code belong to the class of "informational" return code ?
+*)
 
 val is_success : int -> bool
 (** Is the given int code belong to the class of "success" return code ? *)

@@ -14,10 +14,10 @@ exception Isnt_a_file
 let respond_file ?headers ~fname () =
   Lwt.catch
     (fun () ->
-      (* Check this isnt a directory first *)
+      (* Check this isn't a directory first *)
       ( fname |> Lwt_unix.stat >>= fun s ->
-        if Unix.(s.st_kind <> S_REG) then Lwt.fail Isnt_a_file
-        else Lwt.return_unit )
+        if Unix.(s.st_kind <> S_REG) then raise Isnt_a_file else Lwt.return_unit
+      )
       >>= fun () ->
       let count = 16384 in
       Lwt_io.open_file ~buffer:(Lwt_bytes.create count) ~mode:Lwt_io.input fname
@@ -55,7 +55,7 @@ let respond_file ?headers ~fname () =
     (function
       | Unix.Unix_error (Unix.ENOENT, _, _) | Isnt_a_file ->
           respond_not_found ()
-      | exn -> Lwt.fail exn)
+      | exn -> Lwt.reraise exn)
 
 let log_on_exn = function
   | Unix.Unix_error (error, func, arg) ->
@@ -65,7 +65,7 @@ let log_on_exn = function
   | exn -> Log.err (fun m -> m "Unhandled exception: %a" Fmt.exn exn)
 
 let create ?timeout ?backlog ?stop ?(on_exn = log_on_exn)
-    ?(ctx = Net.default_ctx) ?(mode = `TCP (`Port 8080)) spec =
+    ?(ctx = Lazy.force Net.default_ctx) ?(mode = `TCP (`Port 8080)) spec =
   Conduit_lwt_unix.serve ?backlog ?timeout ?stop ~on_exn ~ctx:ctx.Net.ctx ~mode
     (fun flow ic oc ->
       let ic = Input_channel.create ic in

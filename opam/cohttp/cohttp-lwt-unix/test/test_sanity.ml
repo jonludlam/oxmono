@@ -50,22 +50,22 @@ let server =
       (fun _ _ ->
         Lwt.return
           (`Expert
-            (let headers =
-               Http.(
-                 Header.add_transfer_encoding (Header.init ()) Transfer.Chunked)
-             in
-             ( Http.Response.make ~headers (),
-               fun _ic oc -> Lwt_io.write oc "8\r\nexpert 1\r\n0\r\n\r\n" ))));
+             (let headers =
+                Http.(
+                  Header.add_transfer_encoding (Header.init ()) Transfer.Chunked)
+              in
+              ( Http.Response.make ~headers (),
+                fun _ic oc -> Lwt_io.write oc "8\r\nexpert 1\r\n0\r\n\r\n" ))));
       (fun _ _ ->
         Lwt.return
           (`Expert
-            ( (* Alternatively, cohttp.response.make injects the Chunked encoding when no
+             ( (* Alternatively, cohttp.response.make injects the Chunked encoding when no
                  encoding is already in the headers. *)
-              Cohttp.Response.make (),
-              fun ic oc ->
-                Lwt_io.write oc "8\r\nexpert 2\r\n0\r\n\r\n" >>= fun () ->
-                Lwt_io.flush oc >>= fun () ->
-                Cohttp_lwt_unix.Private.Input_channel.close ic )));
+               Cohttp.Response.make (),
+               fun ic oc ->
+                 Lwt_io.write oc "8\r\nexpert 2\r\n0\r\n\r\n" >>= fun () ->
+                 Lwt_io.flush oc >>= fun () ->
+                 Cohttp_lwt_unix.Private.Input_channel.close ic )));
     ]
   |> response_sequence
 
@@ -78,7 +78,7 @@ let check_logs test () =
 
 let ts =
   Cohttp_lwt_unix_test.test_server_s server (fun uri ->
-      let ctx = Cohttp_lwt_unix.Net.default_ctx in
+      let ctx = Lazy.force Cohttp_lwt_unix.Net.default_ctx in
       let t () =
         Client.get ~ctx uri >>= fun (_, body) ->
         body |> Body.to_string >|= fun body -> assert_equal body message

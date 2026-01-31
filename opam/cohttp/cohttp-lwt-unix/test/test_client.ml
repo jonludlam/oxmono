@@ -54,18 +54,18 @@ let methods (handler : Cohttp_lwt.S.call) uri =
     Body.drain_body body >>= fun () ->
     match Response.status res with
     | `Created | `No_content | `OK -> Lwt.return_unit
-    | _ -> Lwt.fail_with "put failed"
+    | _ -> failwith "put failed"
   and get k =
     handler `GET Uri.(with_path uri k) >>= fun (res, body) ->
     match Response.status res with
     | `OK | `No_content -> Body.to_string body
-    | _ -> Body.drain_body body >>= fun () -> Lwt.fail Not_found
+    | _ -> Body.drain_body body >>= fun () -> raise Not_found
   and delete k =
     handler `DELETE Uri.(with_path uri k) >>= fun (res, body) ->
     Body.drain_body body >>= fun () ->
     match Response.status res with
     | `OK | `No_content -> Lwt.return_unit
-    | _ -> Lwt.fail Not_found
+    | _ -> raise Not_found
   and mem k =
     handler `HEAD Uri.(with_path uri k) >>= fun (res, body) ->
     Body.drain_body body >|= fun () ->
@@ -114,7 +114,10 @@ let test_client uri =
   assert_equal ~printer:Fun.id "Spring" body;
 
   (* simple request function accepting custom requests. *)
-  let handler ?headers ?body meth uri = Client.call ?headers ?body meth uri in
+  let handler ?headers ?body ?absolute_form meth uri =
+    ignore absolute_form;
+    Client.call ?headers ?body meth uri
+  in
   tests handler uri
 
 (* The Client.{call, get, put, ...} functions by default use a new
@@ -127,7 +130,8 @@ let test_client uri =
 (* Simple case: The server is known to support pipelining and won't close the
  * connection unexpectantly (timeout or number of requests may be limited). *)
 let test_persistent uri =
-  Connection.Net.resolve ~ctx:Connection.Net.default_ctx
+  Connection.Net.resolve
+    ~ctx:(Lazy.force Connection.Net.default_ctx)
     uri (* resolve hostname. *)
   >>= Connection.connect ~persistent:true
   >>= fun connection ->
@@ -140,8 +144,10 @@ let test_persistent uri =
  * This might result in a massive amount of parallel connections. *)
 let test_non_persistent uri =
   (* the resolved endpoint may be buffered to avoid stressing the resolver: *)
-  Connection.Net.resolve ~ctx:Connection.Net.default_ctx uri >>= fun endp ->
-  let handler ?headers ?body meth uri =
+  Connection.Net.resolve ~ctx:(Lazy.force Connection.Net.default_ctx) uri
+  >>= fun endp ->
+  let handler ?headers ?body ?absolute_form meth uri =
+    ignore absolute_form;
     Connection.connect ~persistent:false endp >>= fun connection ->
     Connection.call connection ?headers ?body meth uri
   in
@@ -151,12 +157,14 @@ let test_non_persistent uri =
  * not be supported or the server may close the connection unexpectedly.
  * In such a case the pending requests will fail with Connection.Retry. *)
 let test_unknown uri =
-  Connection.Net.resolve ~ctx:Connection.Net.default_ctx uri >>= fun endp ->
+  Connection.Net.resolve ~ctx:(Lazy.force Connection.Net.default_ctx) uri
+  >>= fun endp ->
   (* buffer resolved endp *)
   Connection.connect ~persistent:false endp >>= fun c ->
   let connection = ref c in
   (* reference to open connection *)
-  let rec handler ?headers ?body meth uri =
+  let rec handler ?headers ?body ?absolute_form meth uri =
+    ignore absolute_form;
     Lwt.catch
       (fun () -> Connection.call !connection ?headers ?body meth uri)
       (function
@@ -168,14 +176,14 @@ let test_unknown uri =
             connection := c;
             match body with
             (* Still, body may have been (partially) consumed and needs re-creation. *)
-            | Some (`Stream _) -> Lwt.fail Connection.Retry
+            | Some (`Stream _) -> raise Connection.Retry
             | None | Some (`Empty | `String _ | `Strings _) ->
                 handler ?headers ?body meth uri)
-        | e -> Lwt.fail e)
+        | e -> Lwt.reraise e)
   in
   tests handler uri
 
-(* In that difficult case one might be better of using a Connection_cache which
+(* In that difficult case one might be better off using a Connection_cache which
  * will take care of those trivial retries and reconnecting: *)
 
 module Cache = Cohttp_lwt_unix.Connection_cache

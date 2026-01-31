@@ -51,7 +51,7 @@ module Status : sig
     | `Partial_content  (** partial resource return due to request header *)
     | `Multi_status  (** XML, can contain multiple separate responses *)
     | `Already_reported  (** results previously returned *)
-    | `Im_used  (** request fulfilled, reponse is instance-manipulations *) ]
+    | `Im_used  (** request fulfilled, response is instance-manipulations *) ]
   (** Success *)
 
   type redirection =
@@ -245,10 +245,10 @@ module Header : sig
 
   val replace : t -> string -> string -> t
   (** [replace h k v] replaces the last added value of [k] from [h] and removed
-      all other occurences of [k] if it exists. Otherwise it adds [(k, v)] to
+      all other occurrences of [k] if it exists. Otherwise it adds [(k, v)] to
       [h].
 
-      {e Invariant:} [forall h, k, v. get_multi (replace h k v) = \[ v \]] *)
+      {e Invariant:} [forall h, k, v. get_multi (replace h k v) = [ v ]] *)
 
   val mem : t -> string -> bool
   (** [mem h k] returns [true] if the header name [k] appears in [h] and [false]
@@ -278,14 +278,15 @@ module Header : sig
       returned value is the last value paired with [k] in [h].
 
       {e Invariant:}
-      [forall h, k not a list-value header. get_multi_concat ~list-value-only:true h k = get h k] *)
+      [forall h, k not a list-value header. get_multi_concat
+       ~list-value-only:true h k = get h k] *)
 
   val update : t -> string -> (string option -> string option) -> t
   (** [update h k f] returns an header list containing the same headers as [h],
       except for the header name [k]. Depending on the value of [v] where [v] is
       [f (get h k)], the header pair [(k, v)] is added, removed or updated.
 
-      - If [v] is [None], the last occurence of [k] in [h] is removed;
+      - If [v] is [None], the last occurrence of [k] in [h] is removed;
 
       - If [v] is [Some w] then the last value paired with [k] in [h] is
         replaced by [w] if it exists. Otherwise, the pair [(k, w)] is added;
@@ -299,7 +300,7 @@ module Header : sig
       [vs] is [f (get_multi h k)], the values associated to the header [k] are
       added, removed or updated.
 
-      - If [vs] is an empty list, every occurences of the header [k] in [h] are
+      - If [vs] is an empty list, every occurrences of the header [k] in [h] are
         removed;
 
       - If [vs] is a non-empty list, all values previously associated to [k] are
@@ -357,7 +358,8 @@ module Header : sig
 
       Finally, following
       {{:https://tools.ietf.org/html/rfc7230#section-3.2.2} RFC7230§3.2.2}, the
-      header [Set-cookie] is treated as an exception and ignored by [clean_dup]. *)
+      header [Set-cookie] is treated as an exception and ignored by [clean_dup].
+  *)
 
   val get_content_range : t -> Int64.t option
   val get_connection_close : t -> bool
@@ -385,20 +387,15 @@ module Request : sig
   type t = {
     headers : Header.t;  (** HTTP request headers *)
     meth : Method.t;  (** HTTP request method *)
-    scheme : string option;  (** URI scheme (http or https) *)
     resource : string;  (** Request path and query *)
     version : Version.t;  (** HTTP version, usually 1.1 *)
-    encoding : Transfer.encoding;
-        [@deprecated "this field will be removed in the future"]
   }
 
   val has_body : t -> [ `No | `Unknown | `Yes ]
   val headers : t -> Header.t
   val meth : t -> Method.t
-  val scheme : t -> string option
   val resource : t -> string
   val version : t -> Version.t
-  val encoding : t -> Transfer.encoding
   val compare : t -> t -> int
 
   val is_keep_alive : t -> bool
@@ -431,45 +428,25 @@ module Request : sig
       that a user-agent can handle HTTP chunked trailers headers. *)
 
   val make :
-    ?meth:Method.t ->
-    ?version:Version.t ->
-    ?headers:Header.t ->
-    ?scheme:string ->
-    string ->
-    t
+    ?meth:Method.t -> ?version:Version.t -> ?headers:Header.t -> string -> t
   (** [make resource] is a value of {!type:t}. The default values for the
       response, if not specified, are as follows: [meth] is [`GET], [version] is
-      [`HTTP_1_1], [headers] is [Header.empty] and [scheme] is [None]. The
-      request encoding value is determined via the
-      [Header.get_transfer_encoding] function.*)
+      [`HTTP_1_1], [headers] is [Header.empty]. The request encoding value is
+      determined via the [Header.get_transfer_encoding] function.*)
 
   val pp : Format.formatter -> t -> unit
 end
 
 module Response : sig
   type t = {
-    encoding : Transfer.encoding;
-        [@deprecated "this field will be removed in the future"]
     headers : Header.t;  (** response HTTP headers *)
     version : Version.t;  (** (** HTTP version, usually 1.1 *) *)
     status : Status.t;  (** HTTP status code of the response *)
-    flush : bool;
-        [@deprecated
-          "this field will be removed in the future. Provide flush in the \
-           [respond_*] function instead."]
   }
 
-  val encoding : t -> Transfer.encoding
   val headers : t -> Header.t
   val version : t -> Version.t
   val status : t -> Status.t
-
-  val flush :
-    (t -> bool
-    [@deprecated
-      "this field will be removed in the future. Provide flush in the \
-       [respond_*] function instead."])
-
   val compare : t -> t -> int
 
   val is_keep_alive : t -> bool
@@ -496,16 +473,11 @@ module Response : sig
       See https://www.rfc-editor.org/rfc/rfc7230#section-3.3.2 *)
 
   val make :
-    ?version:Version.t ->
-    ?status:Status.t ->
-    ?flush:bool ->
-    ?headers:Header.t ->
-    unit ->
-    t
+    ?version:Version.t -> ?status:Status.t -> ?headers:Header.t -> unit -> t
   (** [make ()] is a value of {!type:t}. The default values for the request, if
-      not specified, are: [status] is [`Ok], [version] is [`HTTP_1_1], [flush]
-      is [false] and [headers] is [Header.empty]. The request encoding value is
-      determined via the [Header.get_transfer_encoding] function. *)
+      not specified, are: [status] is [`Ok], [version] is [`HTTP_1_1]. The
+      request encoding value is determined via the
+      [Header.get_transfer_encoding] function. *)
 
   val pp : Format.formatter -> t -> unit
 end
