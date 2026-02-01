@@ -293,6 +293,18 @@ module Sync = struct
     Log.info (fun m -> m "Syncing %s with %s"
       (Eio.Path.native_exn repo) config.remote);
 
+    (* Ensure directory exists *)
+    let dir_exists =
+      match Eio.Path.stat ~follow:false repo with
+      | _ -> true
+      | exception Eio.Io (Eio.Fs.E (Eio.Fs.Not_found _), _) -> false
+    in
+    if not dir_exists then begin
+      Log.info (fun m -> m "Creating directory %s" (Eio.Path.native_exn repo));
+      if not t.dry_run then
+        Eio.Path.mkdirs ~exists_ok:true ~perm:0o755 repo
+    end;
+
     (* Ensure repo exists *)
     if not (is_repo t ~repo) then begin
       Log.info (fun m -> m "Initializing git repository");
