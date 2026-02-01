@@ -17,7 +17,7 @@ let rec find (headers : t list @ local) name = exclave_
     let matches =
       match name, hdr.name with
       | Name.Other, _ | _, Name.Other -> false
-      | n1, n2 -> Poly.( = ) n1 n2
+      | n1, n2 -> phys_equal n1 n2
     in
     if matches then Some hdr else find rest name
 ;;
