@@ -1,5 +1,9 @@
 # Gitops Library Design
 
+**Status:** Implemented
+
+**Implementation:** See `avsm/gitops/` for the library and `bushel git-sync` command.
+
 Git-based data sync for bushel and sortal via SSH remotes.
 
 ## Goals
