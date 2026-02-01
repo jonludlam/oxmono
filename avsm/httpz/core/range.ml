@@ -10,6 +10,11 @@ let[@inline always] to_i16 x = I16.to_int x
 let[@inline always] i64 x = I64.of_int64 x
 let[@inline always] to_i64 x = I64.to_int64 x
 
+(* Unboxed char helpers - use Buf_read's primitives *)
+let[@inline always] peek buf pos = Buf_read.peek buf (i16 pos)
+let[@inline always] digit_value c = Buf_read.digit_value c
+let ( =. ) = Buf_read.( =. )
+
 (* Byte range specification - unboxed *)
 type byte_range =
   #{ kind : int      (* 0=Range, 1=Suffix, 2=Open *)
@@ -51,13 +56,10 @@ type eval_result =
   | Multiple_ranges
   | Not_satisfiable
 
-(* Skip whitespace *)
+(* Skip whitespace using unboxed char operations *)
 let[@inline] skip_ws buf ~pos ~len =
   let mutable p = pos in
-  while p < len && (
-    let c = Bytes.unsafe_get buf p in
-    Char.equal c ' ' || Char.equal c '\t'
-  ) do
+  while p < len && Buf_read.is_space (peek buf p) do
     p <- p + 1
   done;
   p
@@ -72,9 +74,9 @@ let[@inline] parse_int64 buf ~pos ~len =
   let mutable valid = true in
   let mutable overflow = false in
   while valid && p < len do
-    let c = Bytes.unsafe_get buf p in
-    if Char.is_digit c then (
-      let digit = Int64.of_int (Char.to_int c - 48) in
+    let d = digit_value (peek buf p) in
+    if d >= 0 then (
+      let digit = Int64.of_int d in
       let new_acc = Int64.(acc * 10L + digit) in
       if Int64.(new_acc < acc) then (
         overflow <- true;
@@ -96,8 +98,8 @@ let[@inline] parse_range_spec buf ~pos ~len =
   let pos = skip_ws buf ~pos ~len in
   if pos >= len then #(false, empty, pos)
   else
-    let c = Bytes.unsafe_get buf pos in
-    if Char.equal c '-' then
+    let c = peek buf pos in
+    if c =. #'-' then
       (* Suffix range: -500 *)
       let #(suffix, end_pos, valid) = parse_int64 buf ~pos:(pos + 1) ~len in
       if (not valid) || Int64.(suffix = 0L) then
@@ -109,13 +111,13 @@ let[@inline] parse_range_spec buf ~pos ~len =
       let #(start, after_start, valid) = parse_int64 buf ~pos ~len in
       if not valid then #(false, empty, after_start)
       else if after_start >= len then #(false, empty, after_start)
-      else if not (Char.equal (Bytes.unsafe_get buf after_start) '-') then
+      else if not (peek buf after_start =. #'-') then
         #(false, empty, after_start)
       else
         let after_dash = after_start + 1 in
         if after_dash >= len || (
-          let c = Bytes.unsafe_get buf after_dash in
-          Char.equal c ',' || Char.equal c ' ' || Char.equal c '\t'
+          let c = peek buf after_dash in
+          c =. #',' || c =. #' ' || c =. #'\t'
         ) then
           (* Open range: start- *)
           #(true, #{ kind = kind_open; start = i64 start; end_ = i64 0L }, after_dash)
@@ -133,7 +135,7 @@ let parse_region (local_ buf) ~off ~len (ranges : byte_range array) : #(parse_st
   let end_pos = off + len in
   (* Look for "=" to split unit and ranges *)
   let mutable eq_pos = off in
-  while eq_pos < end_pos && not (Char.equal (Bytes.unsafe_get buf eq_pos) '=') do
+  while eq_pos < end_pos && not (peek buf eq_pos =. #'=') do
     eq_pos <- eq_pos + 1
   done;
   if eq_pos >= end_pos then #(Invalid, i16 0)
@@ -143,16 +145,16 @@ let parse_region (local_ buf) ~off ~len (ranges : byte_range array) : #(parse_st
     if unit_len <> 5 then #(Invalid, i16 0)
     else
       let is_bytes =
-        let c0 = Bytes.unsafe_get buf off in
-        let c1 = Bytes.unsafe_get buf (off + 1) in
-        let c2 = Bytes.unsafe_get buf (off + 2) in
-        let c3 = Bytes.unsafe_get buf (off + 3) in
-        let c4 = Bytes.unsafe_get buf (off + 4) in
-        (Char.equal c0 'b' || Char.equal c0 'B') &&
-        (Char.equal c1 'y' || Char.equal c1 'Y') &&
-        (Char.equal c2 't' || Char.equal c2 'T') &&
-        (Char.equal c3 'e' || Char.equal c3 'E') &&
-        (Char.equal c4 's' || Char.equal c4 'S')
+        let c0 = peek buf off in
+        let c1 = peek buf (off + 1) in
+        let c2 = peek buf (off + 2) in
+        let c3 = peek buf (off + 3) in
+        let c4 = peek buf (off + 4) in
+        (c0 =. #'b' || c0 =. #'B') &&
+        (c1 =. #'y' || c1 =. #'Y') &&
+        (c2 =. #'t' || c2 =. #'T') &&
+        (c3 =. #'e' || c3 =. #'E') &&
+        (c4 =. #'s' || c4 =. #'S')
       in
       if not is_bytes then #(Invalid, i16 0)
       else
@@ -172,7 +174,7 @@ let parse_region (local_ buf) ~off ~len (ranges : byte_range array) : #(parse_st
             );
             pos <- skip_ws buf ~pos:after_range ~len:end_pos;
             if pos < end_pos then
-              if Char.equal (Bytes.unsafe_get buf pos) ',' then
+              if peek buf pos =. #',' then
                 pos <- pos + 1
               else
                 valid <- false

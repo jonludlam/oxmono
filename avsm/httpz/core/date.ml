@@ -3,9 +3,16 @@
 open Base
 
 module F64 = Stdlib_upstream_compatible.Float_u
+module I16 = Stdlib_stable.Int16_u
 
 let[@inline always] f64 x = F64.of_float x
 let[@inline always] to_float x = F64.to_float x
+let[@inline always] i16 x = I16.of_int x
+
+(* Unboxed char helpers - use Buf_read's primitives *)
+let[@inline always] peek buf pos = Buf_read.peek buf (i16 pos)
+let[@inline always] digit_value c = Buf_read.digit_value c
+let ( =. ) = Buf_read.( =. )
 
 type status =
   | Valid
@@ -17,23 +24,24 @@ let month_names = [| "Jan"; "Feb"; "Mar"; "Apr"; "May"; "Jun"; "Jul"; "Aug"; "Se
 
 (* Parse 2-digit number at position, returns (value, valid) *)
 let[@inline] parse_2digit buf pos =
-  let c0 = Bytes.unsafe_get buf pos in
-  let c1 = Bytes.unsafe_get buf (pos + 1) in
-  if Char.is_digit c0 && Char.is_digit c1 then
-    #((Char.to_int c0 - 48) * 10 + (Char.to_int c1 - 48), true)
+  let c0 = peek buf pos in
+  let c1 = peek buf (pos + 1) in
+  let d0 = digit_value c0 in
+  let d1 = digit_value c1 in
+  if d0 >= 0 && d1 >= 0 then
+    #(d0 * 10 + d1, true)
   else
     #(0, false)
 ;;
 
 (* Parse 4-digit year at position, returns (value, valid) *)
 let[@inline] parse_4digit buf pos =
-  let c0 = Bytes.unsafe_get buf pos in
-  let c1 = Bytes.unsafe_get buf (pos + 1) in
-  let c2 = Bytes.unsafe_get buf (pos + 2) in
-  let c3 = Bytes.unsafe_get buf (pos + 3) in
-  if Char.is_digit c0 && Char.is_digit c1 && Char.is_digit c2 && Char.is_digit c3 then
-    #((Char.to_int c0 - 48) * 1000 + (Char.to_int c1 - 48) * 100 +
-      (Char.to_int c2 - 48) * 10 + (Char.to_int c3 - 48), true)
+  let d0 = digit_value (peek buf pos) in
+  let d1 = digit_value (peek buf (pos + 1)) in
+  let d2 = digit_value (peek buf (pos + 2)) in
+  let d3 = digit_value (peek buf (pos + 3)) in
+  if d0 >= 0 && d1 >= 0 && d2 >= 0 && d3 >= 0 then
+    #(d0 * 1000 + d1 * 100 + d2 * 10 + d3, true)
   else
     #(0, false)
 ;;
@@ -42,40 +50,43 @@ let[@inline] parse_4digit buf pos =
 let[@inline] parse_day buf pos len =
   if pos >= len then #(0, pos, false)
   else
-    let c0 = Bytes.unsafe_get buf pos in
-    if Char.equal c0 ' ' && pos + 1 < len then
+    let c0 = peek buf pos in
+    if c0 =. #' ' && pos + 1 < len then
       (* Space-padded single digit *)
-      let c1 = Bytes.unsafe_get buf (pos + 1) in
-      if Char.is_digit c1 then #(Char.to_int c1 - 48, pos + 2, true)
+      let d1 = digit_value (peek buf (pos + 1)) in
+      if d1 >= 0 then #(d1, pos + 2, true)
       else #(0, pos, false)
-    else if Char.is_digit c0 && pos + 1 < len then
-      let c1 = Bytes.unsafe_get buf (pos + 1) in
-      if Char.is_digit c1 then
-        #((Char.to_int c0 - 48) * 10 + (Char.to_int c1 - 48), pos + 2, true)
-      else
-        #(Char.to_int c0 - 48, pos + 1, true)
     else
-      #(0, pos, false)
+      let d0 = digit_value c0 in
+      if d0 >= 0 && pos + 1 < len then
+        let d1 = digit_value (peek buf (pos + 1)) in
+        if d1 >= 0 then
+          #(d0 * 10 + d1, pos + 2, true)
+        else
+          #(d0, pos + 1, true)
+      else
+        #(0, pos, false)
 ;;
 
-(* Parse 3-letter month abbreviation, returns 0-11 or -1 *)
+(* Parse 3-letter month abbreviation, returns 0-11 or -1
+   Uses unboxed tuple pattern matching for cleaner code *)
 let[@inline] parse_month buf pos =
-  let c0 = Bytes.unsafe_get buf pos in
-  let c1 = Bytes.unsafe_get buf (pos + 1) in
-  let c2 = Bytes.unsafe_get buf (pos + 2) in
-  match (c0, c1, c2) with
-  | ('J', 'a', 'n') -> 0
-  | ('F', 'e', 'b') -> 1
-  | ('M', 'a', 'r') -> 2
-  | ('A', 'p', 'r') -> 3
-  | ('M', 'a', 'y') -> 4
-  | ('J', 'u', 'n') -> 5
-  | ('J', 'u', 'l') -> 6
-  | ('A', 'u', 'g') -> 7
-  | ('S', 'e', 'p') -> 8
-  | ('O', 'c', 't') -> 9
-  | ('N', 'o', 'v') -> 10
-  | ('D', 'e', 'c') -> 11
+  let c0 = peek buf pos in
+  let c1 = peek buf (pos + 1) in
+  let c2 = peek buf (pos + 2) in
+  match #(c0, c1, c2) with
+  | #(#'J', #'a', #'n') -> 0
+  | #(#'F', #'e', #'b') -> 1
+  | #(#'M', #'a', #'r') -> 2
+  | #(#'A', #'p', #'r') -> 3
+  | #(#'M', #'a', #'y') -> 4
+  | #(#'J', #'u', #'n') -> 5
+  | #(#'J', #'u', #'l') -> 6
+  | #(#'A', #'u', #'g') -> 7
+  | #(#'S', #'e', #'p') -> 8
+  | #(#'O', #'c', #'t') -> 9
+  | #(#'N', #'o', #'v') -> 10
+  | #(#'D', #'e', #'c') -> 11
   | _ -> -1
 ;;
 
@@ -83,11 +94,11 @@ let[@inline] parse_month buf pos =
 let[@inline] parse_time buf pos =
   let #(hour, h_valid) = parse_2digit buf pos in
   if not h_valid then #(0, 0, 0, false)
-  else if not (Char.equal (Bytes.unsafe_get buf (pos + 2)) ':') then #(0, 0, 0, false)
+  else if not (peek buf (pos + 2) =. #':') then #(0, 0, 0, false)
   else
     let #(minute, m_valid) = parse_2digit buf (pos + 3) in
     if not m_valid then #(0, 0, 0, false)
-    else if not (Char.equal (Bytes.unsafe_get buf (pos + 5)) ':') then #(0, 0, 0, false)
+    else if not (peek buf (pos + 5) =. #':') then #(0, 0, 0, false)
     else
       let #(second, s_valid) = parse_2digit buf (pos + 6) in
       if not s_valid then #(0, 0, 0, false)
@@ -103,6 +114,18 @@ let[@inline] is_leap_year year =
   (year % 4 = 0 && year % 100 <> 0) || (year % 400 = 0)
 ;;
 
+(* Days from epoch (1970-01-01) to start of year using formula.
+   This avoids the O(year) loop in the original implementation. *)
+let[@inline] days_to_year year =
+  let y = year - 1 in
+  let y0 = 1969 in  (* year before epoch *)
+  (* Formula: count days for each year since 1970, accounting for leap years *)
+  365 * (y - y0) + (y / 4 - y0 / 4) - (y / 100 - y0 / 100) + (y / 400 - y0 / 400)
+;;
+
+(* Cumulative days before each month (0-indexed, non-leap year) *)
+let days_before_month = [| 0; 31; 59; 90; 120; 151; 181; 212; 243; 273; 304; 334 |]
+
 (* Convert date components to Unix timestamp, returns (timestamp, valid) *)
 let to_timestamp ~year ~month ~day ~hour ~minute ~second =
   (* Validate ranges *)
@@ -114,19 +137,14 @@ let to_timestamp ~year ~month ~day ~hour ~minute ~second =
     in
     if day < 1 || day > max_day then #(f64 0.0, false)
     else
-      (* Calculate days since epoch *)
-      let mutable days = 0 in
-      (* Add days for complete years *)
-      for y = 1970 to year - 1 do
-        days <- days + (if is_leap_year y then 366 else 365)
-      done;
+      (* Calculate days since epoch using formula *)
+      let days = days_to_year year in
       (* Add days for complete months in current year *)
-      for m = 0 to month - 1 do
-        days <- days + days_in_month.(m);
-        if m = 1 && is_leap_year year then days <- days + 1
-      done;
-      (* Add days in current month *)
-      days <- days + (day - 1);
+      let days = days + days_before_month.(month) in
+      (* Add leap day if past February in a leap year *)
+      let days = if month > 1 && is_leap_year year then days + 1 else days in
+      (* Add days in current month (day is 1-indexed) *)
+      let days = days + (day - 1) in
       (* Convert to seconds and add time *)
       let timestamp =
         Float.of_int days *. 86400.0 +.
@@ -146,24 +164,24 @@ let parse_imf_fixdate buf off len =
   else
     (* Skip day name - find comma *)
     let mutable comma_pos = off in
-    while comma_pos < off + 4 && not (Char.equal (Bytes.unsafe_get buf comma_pos) ',') do
+    while comma_pos < off + 4 && not (peek buf comma_pos =. #',') do
       comma_pos <- comma_pos + 1
     done;
-    if comma_pos >= off + len || not (Char.equal (Bytes.unsafe_get buf comma_pos) ',') then invalid_result
-    else if not (Char.equal (Bytes.unsafe_get buf (comma_pos + 1)) ' ') then invalid_result
+    if comma_pos >= off + len || not (peek buf comma_pos =. #',') then invalid_result
+    else if not (peek buf (comma_pos + 1) =. #' ') then invalid_result
     else
       let day_pos = comma_pos + 2 in
       let #(day, day_valid) = parse_2digit buf day_pos in
       if not day_valid then invalid_result
-      else if not (Char.equal (Bytes.unsafe_get buf (day_pos + 2)) ' ') then invalid_result
+      else if not (peek buf (day_pos + 2) =. #' ') then invalid_result
       else
         let month = parse_month buf (day_pos + 3) in
         if month < 0 then invalid_result
-        else if not (Char.equal (Bytes.unsafe_get buf (day_pos + 6)) ' ') then invalid_result
+        else if not (peek buf (day_pos + 6) =. #' ') then invalid_result
         else
           let #(year, year_valid) = parse_4digit buf (day_pos + 7) in
           if not year_valid then invalid_result
-          else if not (Char.equal (Bytes.unsafe_get buf (day_pos + 11)) ' ') then invalid_result
+          else if not (peek buf (day_pos + 11) =. #' ') then invalid_result
           else
             let #(hour, minute, second, time_valid) = parse_time buf (day_pos + 12) in
             if not time_valid then invalid_result
@@ -171,10 +189,10 @@ let parse_imf_fixdate buf off len =
               (* Check for " GMT" at end *)
               let gmt_pos = day_pos + 20 in
               if gmt_pos + 4 > off + len then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf gmt_pos) ' ') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 1)) 'G') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 2)) 'M') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 3)) 'T') then invalid_result
+              else if not (peek buf gmt_pos =. #' ') then invalid_result
+              else if not (peek buf (gmt_pos + 1) =. #'G') then invalid_result
+              else if not (peek buf (gmt_pos + 2) =. #'M') then invalid_result
+              else if not (peek buf (gmt_pos + 3) =. #'T') then invalid_result
               else to_timestamp ~year ~month ~day ~hour ~minute ~second
 ;;
 
@@ -182,20 +200,20 @@ let parse_imf_fixdate buf off len =
 let parse_rfc850 buf off len =
   (* Find comma after full day name *)
   let mutable comma_pos = off in
-  while comma_pos < off + 10 && not (Char.equal (Bytes.unsafe_get buf comma_pos) ',') do
+  while comma_pos < off + 10 && not (peek buf comma_pos =. #',') do
     comma_pos <- comma_pos + 1
   done;
-  if comma_pos >= off + len || not (Char.equal (Bytes.unsafe_get buf comma_pos) ',') then invalid_result
-  else if not (Char.equal (Bytes.unsafe_get buf (comma_pos + 1)) ' ') then invalid_result
+  if comma_pos >= off + len || not (peek buf comma_pos =. #',') then invalid_result
+  else if not (peek buf (comma_pos + 1) =. #' ') then invalid_result
   else
     let pos = comma_pos + 2 in
     let #(day, day_valid) = parse_2digit buf pos in
     if not day_valid then invalid_result
-    else if not (Char.equal (Bytes.unsafe_get buf (pos + 2)) '-') then invalid_result
+    else if not (peek buf (pos + 2) =. #'-') then invalid_result
     else
       let month = parse_month buf (pos + 3) in
       if month < 0 then invalid_result
-      else if not (Char.equal (Bytes.unsafe_get buf (pos + 6)) '-') then invalid_result
+      else if not (peek buf (pos + 6) =. #'-') then invalid_result
       else
         let #(year2, year2_valid) = parse_2digit buf (pos + 7) in
         if not year2_valid then invalid_result
@@ -203,7 +221,7 @@ let parse_rfc850 buf off len =
           (* RFC 850 uses 2-digit year. Interpret 00-99 as 2000-2099 for dates >= 70,
              and 1970-1999 for dates < 70. Modern interpretation varies. *)
           let year = if year2 >= 70 then 1900 + year2 else 2000 + year2 in
-          if not (Char.equal (Bytes.unsafe_get buf (pos + 9)) ' ') then invalid_result
+          if not (peek buf (pos + 9) =. #' ') then invalid_result
           else
             let #(hour, minute, second, time_valid) = parse_time buf (pos + 10) in
             if not time_valid then invalid_result
@@ -211,10 +229,10 @@ let parse_rfc850 buf off len =
               (* Check for " GMT" *)
               let gmt_pos = pos + 18 in
               if gmt_pos + 4 > off + len then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf gmt_pos) ' ') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 1)) 'G') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 2)) 'M') then invalid_result
-              else if not (Char.equal (Bytes.unsafe_get buf (gmt_pos + 3)) 'T') then invalid_result
+              else if not (peek buf gmt_pos =. #' ') then invalid_result
+              else if not (peek buf (gmt_pos + 1) =. #'G') then invalid_result
+              else if not (peek buf (gmt_pos + 2) =. #'M') then invalid_result
+              else if not (peek buf (gmt_pos + 3) =. #'T') then invalid_result
               else to_timestamp ~year ~month ~day ~hour ~minute ~second
 ;;
 
@@ -223,21 +241,21 @@ let parse_asctime buf off len =
   (* Minimum length: "Sun Nov  6 08:49:37 1994" = 24 chars *)
   if len < 24 then invalid_result
   (* Skip 3-char day name and space *)
-  else if not (Char.equal (Bytes.unsafe_get buf (off + 3)) ' ') then invalid_result
+  else if not (peek buf (off + 3) =. #' ') then invalid_result
   else
     let month = parse_month buf (off + 4) in
     if month < 0 then invalid_result
-    else if not (Char.equal (Bytes.unsafe_get buf (off + 7)) ' ') then invalid_result
+    else if not (peek buf (off + 7) =. #' ') then invalid_result
     else
       let #(day, next_pos, day_valid) = parse_day buf (off + 8) len in
       if not day_valid then invalid_result
-      else if not (Char.equal (Bytes.unsafe_get buf next_pos) ' ') then invalid_result
+      else if not (peek buf next_pos =. #' ') then invalid_result
       else
         let #(hour, minute, second, time_valid) = parse_time buf (next_pos + 1) in
         if not time_valid then invalid_result
         else
           let year_pos = next_pos + 9 in
-          if not (Char.equal (Bytes.unsafe_get buf year_pos) ' ') then invalid_result
+          if not (peek buf year_pos =. #' ') then invalid_result
           else
             let #(year, year_valid) = parse_4digit buf (year_pos + 1) in
             if not year_valid then invalid_result
@@ -251,12 +269,12 @@ let parse (local_ buf) (sp : Span.t) : #(status * float#) =
   if len < 24 then #(Invalid, f64 0.0)
   else
     (* Check for comma to distinguish IMF-fixdate/RFC850 from asctime *)
-    let c4 = Bytes.unsafe_get buf (off + 3) in
+    let c4 = peek buf (off + 3) in
     let #(ts, valid) =
-      if Char.equal c4 ',' then
+      if c4 =. #',' then
         (* IMF-fixdate: short day name + comma *)
         parse_imf_fixdate buf off len
-      else if Char.equal c4 ' ' then
+      else if c4 =. #' ' then
         (* asctime: short day name + space *)
         parse_asctime buf off len
       else

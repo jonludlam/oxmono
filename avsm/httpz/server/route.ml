@@ -68,7 +68,7 @@ type ctx = {
 }
 
 let[@inline] meth ctx = ctx.meth
-let[@inline] is_head ctx = Poly.equal ctx.meth Httpz.Method.Head
+let[@inline] is_head ctx = phys_equal ctx.meth Httpz.Method.Head
 
 let[@inline] path ctx =
   "/" ^ String.concat ~sep:"/" ctx.segments
@@ -92,7 +92,7 @@ let[@inline] query ctx = Httpz.Target.query_to_string_pairs ctx.buf ctx.query
     generates the body; it will only be called for non-HEAD requests. *)
 
 let[@inline] html_gen ctx (local_ respond) f =
-  if Poly.equal ctx.meth Httpz.Method.Head then
+  if is_head ctx then
     respond ~status:Httpz.Res.Success
       ~headers:[(Httpz.Header_name.Content_type, "text/html; charset=utf-8")]
       Empty
@@ -102,7 +102,7 @@ let[@inline] html_gen ctx (local_ respond) f =
       (String (f ()))
 
 let[@inline] json_gen ctx (local_ respond) f =
-  if Poly.equal ctx.meth Httpz.Method.Head then
+  if is_head ctx then
     respond ~status:Httpz.Res.Success
       ~headers:[(Httpz.Header_name.Content_type, "application/json; charset=utf-8")]
       Empty
@@ -112,7 +112,7 @@ let[@inline] json_gen ctx (local_ respond) f =
       (String (f ()))
 
 let[@inline] xml_gen ctx (local_ respond) f =
-  if Poly.equal ctx.meth Httpz.Method.Head then
+  if is_head ctx then
     respond ~status:Httpz.Res.Success
       ~headers:[(Httpz.Header_name.Content_type, "application/xml")]
       Empty
@@ -122,7 +122,7 @@ let[@inline] xml_gen ctx (local_ respond) f =
       (String (f ()))
 
 let[@inline] atom_gen ctx (local_ respond) f =
-  if Poly.equal ctx.meth Httpz.Method.Head then
+  if is_head ctx then
     respond ~status:Httpz.Res.Success
       ~headers:[(Httpz.Header_name.Content_type, "application/atom+xml; charset=utf-8")]
       Empty
@@ -132,7 +132,7 @@ let[@inline] atom_gen ctx (local_ respond) f =
       (String (f ()))
 
 let[@inline] plain_gen ctx (local_ respond) f =
-  if Poly.equal ctx.meth Httpz.Method.Head then
+  if is_head ctx then
     respond ~status:Httpz.Res.Success
       ~headers:[(Httpz.Header_name.Content_type, "text/plain")]
       Empty
@@ -192,7 +192,7 @@ let rec find_header buf (local_ headers : Httpz.Header.t list) name =
   match headers with
   | [] -> None
   | h :: rest ->
-      if Poly.equal h.Httpz.Header.name name
+      if phys_equal h.Httpz.Header.name name
       then Some (Httpz.Span.to_string buf h.Httpz.Header.value)
       else find_header buf rest name
 
@@ -298,8 +298,8 @@ let[@inline] try_route (Route { meth = route_meth; pat; hdr; handler })
     meth (local_ req_headers) segments ctx (local_ respond) =
   (* HEAD matches GET routes - handlers can check ctx.meth to skip body generation *)
   let method_matches =
-    Poly.equal meth route_meth ||
-    (Poly.equal meth Httpz.Method.Head && Poly.equal route_meth Httpz.Method.Get)
+    phys_equal meth route_meth ||
+    (phys_equal meth Httpz.Method.Head && phys_equal route_meth Httpz.Method.Get)
   in
   if not method_matches then false
   else

@@ -3,7 +3,15 @@
 open Base
 
 module I16 = Stdlib_stable.Int16_u
+module Char_u = Stdlib_stable.Char_u
+
 let[@inline] i16 x = I16.of_int x
+
+(* Unboxed char helpers *)
+let[@inline always] peek buf pos = Buf_read.peek buf (i16 pos)
+let[@inline always] peek_str s i = Char_u.of_char (String.unsafe_get s i)
+let ( =. ) = Buf_read.( =. )
+let ( <>. ) = Buf_read.( <>. )
 
 (** Parsed target with path and query. *)
 type t =
@@ -24,7 +32,7 @@ let[@inline] parse (local_ buf : bytes) (target : Span.t) : t =
     let mutable i = 0 in
     let mutable found = -1 in
     while found < 0 && i < tlen do
-      if Char.equal (Bytes.unsafe_get buf (toff + i)) '?' then
+      if peek buf (toff + i) =. #'?' then
         found <- i
       else
         i <- i + 1
@@ -58,17 +66,17 @@ let[@inline] match_segment (local_ buf : bytes) (path : Span.t) (expected : stri
     let elen = String.length expected in
     (* Find next '/' *)
     let mutable i = 0 in
-    while i < plen && not (Char.equal (Bytes.unsafe_get buf (poff + i)) '/') do
+    while i < plen && peek buf (poff + i) <>. #'/' do
       i <- i + 1
     done;
     (* Check if segment matches *)
     if i <> elen then #(false, empty_span)
     else (
-      (* Manual char-by-char comparison *)
+      (* Manual char-by-char comparison using unboxed chars *)
       let mutable j = 0 in
       let mutable eq = true in
       while eq && j < elen do
-        if not (Char.equal (Bytes.unsafe_get buf (poff + j)) (String.unsafe_get expected j))
+        if not (peek buf (poff + j) =. peek_str expected j)
         then eq <- false
         else j <- j + 1
       done;
@@ -88,7 +96,7 @@ let[@inline] match_param (local_ buf : bytes) (path : Span.t) : #(bool * Span.t 
     let poff = Span.off path in
     (* Find next '/' *)
     let mutable i = 0 in
-    while i < plen && not (Char.equal (Bytes.unsafe_get buf (poff + i)) '/') do
+    while i < plen && peek buf (poff + i) <>. #'/' do
       i <- i + 1
     done;
     let seg = Span.make ~off:(i16 poff) ~len:(i16 i) in
