@@ -369,4 +369,46 @@ module Sync = struct
     in
 
     { pulled; pushed }
+
+  (** {2 Cmdliner Integration} *)
+
+  module Cmd = struct
+    open Cmdliner
+
+    let dry_run_term =
+      let doc = "Show what would be done without making changes." in
+      Arg.(value & flag & info ["dry-run"; "n"] ~doc)
+
+    let verbose_term =
+      let doc = "Enable verbose logging of git operations." in
+      Arg.(value & flag & info ["verbose"; "v"] ~doc)
+
+    let setup_term =
+      let setup dry_run verbose =
+        Fmt_tty.setup_std_outputs ();
+        let level = if verbose then Some Logs.Debug else Some Logs.Info in
+        Logs.set_level level;
+        Logs.set_reporter (Logs_fmt.reporter ());
+        dry_run
+      in
+      Term.(const setup $ dry_run_term $ verbose_term)
+
+    let remote_term =
+      let doc = "Override sync remote URL." in
+      Arg.(value & opt (some string) None & info ["remote"] ~docv:"URL" ~doc)
+
+    let sync_info =
+      let doc = "Sync data with remote git repository." in
+      let man = [
+        `S Manpage.s_description;
+        `P "Synchronizes the local data directory with a remote git repository.";
+        `P "The sync process:";
+        `P "1. Fetches from the remote";
+        `P "2. Merges any remote changes";
+        `P "3. Commits local changes (if auto_commit is enabled)";
+        `P "4. Pushes to the remote";
+        `P "Use $(b,--dry-run) to see what would be done without making changes.";
+      ] in
+      Cmdliner.Cmd.info "sync" ~doc ~man
+  end
 end
