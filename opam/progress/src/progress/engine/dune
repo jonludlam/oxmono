@@ -4,33 +4,13 @@
 ; Rules for OCaml 5.2 and later
 
 (rule
- (enabled_if
-  (>= %{ocaml_version} "5.2"))
  (action
   (copy# pvector.dynarray.ml pvector.ml)))
 
 (library
  (name pvector)
  (public_name progress.vector)
- (enabled_if
-  (>= %{ocaml_version} "5.2"))
  (modules pvector))
-
-; Rules for OCaml versions after 5.2
-
-(rule
- (enabled_if
-  (< %{ocaml_version} "5.2"))
- (action
-  (copy# pvector.vector.ml pvector.ml)))
-
-(library
- (name pvector)
- (public_name progress.vector)
- (enabled_if
-  (< %{ocaml_version} "5.2"))
- (modules pvector)
- (libraries vector))
 
 ; Main library
 
