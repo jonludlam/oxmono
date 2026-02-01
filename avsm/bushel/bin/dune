@@ -12,4 +12,7 @@
   logs.cli
   logs.fmt
   fmt.tty
-  fmt.cli))
+  fmt.cli
+  gitops
+  ptime
+  srcsetter))

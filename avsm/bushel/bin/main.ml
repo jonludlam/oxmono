@@ -750,6 +750,69 @@ let init_cmd =
   let info = Cmd.info "init" ~doc ~man in
   Cmd.v info Term.(const run $ logging_t $ force)
 
+(** {1 Git Sync Command} *)
+
+let git_sync_cmd =
+  let run () config_file data_dir dry_run remote_override =
+    match load_config config_file with
+    | Error e -> Printf.eprintf "Config error: %s\n" e; 1
+    | Ok config ->
+      let data_dir = get_data_dir config data_dir in
+
+      (* Check if sync is configured *)
+      let sync_config = match remote_override with
+        | Some r -> { config.Bushel_config.sync with Gitops.Sync.Config.remote = r }
+        | None -> config.Bushel_config.sync
+      in
+
+      if sync_config.Gitops.Sync.Config.remote = "" then begin
+        Printf.eprintf "Error: No sync remote configured.\n";
+        Printf.eprintf "Add to ~/.config/bushel/config.toml:\n";
+        Printf.eprintf "  [sync]\n";
+        Printf.eprintf "  remote = \"ssh://server/path/to/repo.git\"\n";
+        Printf.eprintf "\nOr use --remote URL\n";
+        1
+      end else begin
+        Eio_main.run @@ fun env ->
+        let git = Gitops.v ~dry_run env in
+        let repo = Eio.Path.(env#fs / data_dir) in
+
+        Printf.printf "%s bushel data with %s\n"
+          (if dry_run then "Would sync" else "Syncing")
+          sync_config.Gitops.Sync.Config.remote;
+
+        let result = Gitops.Sync.run git ~config:sync_config ~repo in
+
+        if result.pulled then
+          Printf.printf "Pulled changes from remote\n";
+        if result.pushed then
+          Printf.printf "Pushed changes to remote\n";
+        if not result.pulled && not result.pushed then
+          Printf.printf "Already in sync\n";
+        0
+      end
+  in
+  let doc = "Sync bushel data with remote git repository." in
+  let man = [
+    `S Manpage.s_description;
+    `P "Synchronizes your bushel data directory with a remote git repository.";
+    `P "Configure the remote in ~/.config/bushel/config.toml:";
+    `Pre "  [sync]\n  remote = \"ssh://server/path/to/bushel.git\"";
+    `P "The sync process:";
+    `P "1. Fetches from the remote repository";
+    `P "2. Merges any remote changes";
+    `P "3. Commits local changes (if auto_commit is enabled)";
+    `P "4. Pushes to the remote";
+    `P "Use $(b,--dry-run) to preview what would happen.";
+  ] in
+  let info = Cmd.info "git-sync" ~doc ~man in
+  Cmd.v info Term.(const run
+    $ logging_t
+    $ config_file
+    $ data_dir
+    $ Gitops.Sync.Cmd.dry_run_term
+    $ Gitops.Sync.Cmd.remote_term)
+
 (** {1 Main Command Group} *)
 
 let main_cmd =
@@ -773,6 +836,7 @@ let main_cmd =
     show_cmd;
     render_cmd;
     sync_cmd;
+    git_sync_cmd;
     paper_add_cmd;
     video_fetch_cmd;
     config_cmd;
