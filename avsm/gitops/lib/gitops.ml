@@ -42,3 +42,73 @@ let v ~dry_run env =
   { env; dry_run }
 
 let dry_run t = t.dry_run
+
+(** {1 Internal Execution} *)
+
+let src = Logs.Src.create "gitops" ~doc:"Git operations"
+module Log = (val Logs.src_log src : Logs.LOG)
+
+let run_git_raw t ~repo args =
+  let repo_str = Eio.Path.native_exn repo in
+  let cmd = "git" :: "-C" :: repo_str :: args in
+  Log.debug (fun m -> m "Running: %s" (String.concat " " cmd));
+  Eio.Switch.run @@ fun sw ->
+  let mgr = t.env#process_mgr in
+  try
+    let proc = Eio.Process.spawn ~sw mgr cmd in
+    match Eio.Process.await proc with
+    | `Exited 0 -> Ok ()
+    | `Exited n -> Error (Exit_code n)
+    | `Signaled n -> Error (Signaled n)
+  with
+  | Eio.Io _ as exn -> raise exn
+  | exn ->
+      let msg = Printexc.to_string exn in
+      if String.length msg >= 9 && String.sub msg 0 9 = "not found" then
+        Error Command_not_found
+      else if String.length msg >= 7 && String.sub msg 0 7 = "No such" then
+        Error Command_not_found
+      else
+        raise exn
+
+let run_git_output t ~repo args =
+  let repo_str = Eio.Path.native_exn repo in
+  let cmd = "git" :: "-C" :: repo_str :: args in
+  Log.debug (fun m -> m "Running: %s" (String.concat " " cmd));
+  Eio.Switch.run @@ fun sw ->
+  let mgr = t.env#process_mgr in
+  try
+    let stdout_r, stdout_w = Eio.Process.pipe ~sw mgr in
+    let proc = Eio.Process.spawn ~sw ~stdout:stdout_w mgr cmd in
+    Eio.Flow.close stdout_w;
+    let output = Eio.Buf_read.of_flow ~max_size:max_int stdout_r
+                 |> Eio.Buf_read.take_all in
+    match Eio.Process.await proc with
+    | `Exited 0 -> Ok (String.trim output)
+    | `Exited n -> Error (Exit_code n)
+    | `Signaled n -> Error (Signaled n)
+  with
+  | Eio.Io _ as exn -> raise exn
+  | exn ->
+      let msg = Printexc.to_string exn in
+      if String.length msg >= 9 && String.sub msg 0 9 = "not found" then
+        Error Command_not_found
+      else if String.length msg >= 7 && String.sub msg 0 7 = "No such" then
+        Error Command_not_found
+      else
+        raise exn
+
+let raise_git_error ~context err =
+  let exn = Eio.Exn.create (Git err) in
+  let bt = Printexc.get_callstack 10 in
+  Eio.Exn.reraise_with_context exn bt "%s" context
+
+let run_git t ~repo ~context args =
+  match run_git_raw t ~repo args with
+  | Ok () -> ()
+  | Error err -> raise_git_error ~context err
+
+let run_git_for_output t ~repo ~context args =
+  match run_git_output t ~repo args with
+  | Ok output -> output
+  | Error err -> raise_git_error ~context err
