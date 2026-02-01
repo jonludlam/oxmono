@@ -422,7 +422,9 @@ module Note_render = struct
         let parent_title = Entry.title parent_ent in
         body ^ "\n\nRead more about [" ^ parent_title ^ "](:" ^ slug_ent ^ ")."
     in
-    El.div ~at:[At.class' "note"] [El.unsafe_raw (md_to_html ~ctx body_with_ref)]
+    El.div ~at:[At.class' "note"] [
+      entry_href ~ctx (`Note n);
+      El.unsafe_raw (md_to_html ~ctx body_with_ref)]
 
   let references_html ~ctx note =
     let is_perma = Note.perma note in
