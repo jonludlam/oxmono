@@ -1,10 +1,11 @@
 {
   "name": "ocamlfind",
-  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "git_commit": "db29c38848a38bffef89b4a19223137be2205ee2",
   "change_types": [
     "dune-port",
+    "bugfix",
     "compatibility"
   ],
-  "summary": "Add dune build support with META files for standard libraries and fix toplevel logging for OxCaml compatibility.",
-  "details": "- **Dune build system**: Added `dune-project`, `dune` files for building findlib and ocamlfind executables\n- **META files for standard libraries**: Added META files for bigarray, bytes, compiler-libs, dynlink, raw_spacetime, stdlib, str, threads, unix\n- **Configurator-based discovery**: New `tools/discover.ml` using dune-configurator to generate `findlib_config.ml`, `topfind`, and `findlib.conf`\n- **Extract args tool**: Added `tools/extract_args/` with lexer to extract OCaml compiler arguments\n- **Toplevel scripts**: Added `topfind_rd0.p` and `topfind_rd1.p` templates supporting both bytecode and native toplevel\n- **OxCaml compatibility fix**: Modified `topfind.ml.in` to use explicit lambda `fun s -> prerr_endline s` instead of partial application with `ignore`, avoiding type inference issues with OxCaml's stricter typing\n- **Opam packages**: Split into `findlib.opam` (library) and `ocamlfind.opam` (tool) packages\n- **Runtime events support**: Added META template for OCaml 5.x runtime_events library"
+  "summary": "Port to dune build system with OCaml 5+ stdlib META file discovery fix and OxCaml compatibility patch.",
+  "details": "- **Dune port**: Added complete dune build system support including `dune-project`, `dune` files for `src/findlib`, `site-lib-src`, and `tools` directories\n- **Build tooling**: Added `tools/discover.ml` using dune-configurator to generate `findlib_config.ml`, `topfind`, and `findlib.conf`\n- **Build tooling**: Added `tools/extract_args/` with lexer for extracting OCaml compiler arguments\n- **Opam files**: Added separate `findlib.opam` and `ocamlfind.opam` package definitions\n- **OCaml 5+ compatibility**: Modified `findlib.ml` to default search path to `ocaml_stdlib` when no config provided, enabling discovery of standard library META files shipped with OCaml 5+\n- **OxCaml compatibility**: Patched `topfind.ml.in` to use explicit lambdas (`fun s -> prerr_endline s` and `fun _ -> ()`) instead of partial application with `ignore`, fixing type inference issues with OxCaml\n- **Toplevel scripts**: Added `topfind_rd0.p` and `topfind_rd1.p` template files for topfind generation with native/bytecode detection\n- **Runtime events**: Added META file for OCaml 5's `runtime_events` library\n- **Removed**: Deleted obsolete `src/bytes/META` (bytes compatibility shim no longer needed)"
 }

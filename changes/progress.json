@@ -1,7 +1,9 @@
 {
   "name": "progress",
-  "git_commit": "2b73bdb730bf1e4a1e51b9c7311e73b31c0d98f1",
+  "git_commit": "db29c38848a38bffef89b4a19223137be2205ee2",
   "change_types": [
-    "unchanged"
-  ]
+    "compatibility"
+  ],
+  "summary": "Remove OCaml version conditionals to always use Dynarray-based implementation",
+  "details": "- Removes `enabled_if (>= %{ocaml_version} \"5.2\")` conditionals from dune rules\n- Removes fallback rules for OCaml versions prior to 5.2 that used the `vector` library\n- Always uses `pvector.dynarray.ml` implementation instead of conditionally selecting between dynarray and vector backends\n- Removes dependency on external `vector` library for older OCaml versions"
 }

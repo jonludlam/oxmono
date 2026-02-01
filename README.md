@@ -480,17 +480,18 @@ Packages with dune build support added
   - Added `Mtime_clock` interface file (`mtime_clock.mli`) in main `src/` directory for the virtual clock
   - Tests are defined but disabled (marked optional, runtest rules commented out) as they require the `b0` library
   </details>
-- **ocamlfind (1.9.8.git)**: Add dune build support with META files for standard libraries and fix toplevel logging for OxCaml compatibility.
+- **ocamlfind (1.9.8.git)**: Port to dune build system with OCaml 5+ stdlib META file discovery fix and OxCaml compatibility patch.
   <details><summary>Details</summary>
 
-  - **Dune build system**: Added `dune-project`, `dune` files for building findlib and ocamlfind executables
-  - **META files for standard libraries**: Added META files for bigarray, bytes, compiler-libs, dynlink, raw_spacetime, stdlib, str, threads, unix
-  - **Configurator-based discovery**: New `tools/discover.ml` using dune-configurator to generate `findlib_config.ml`, `topfind`, and `findlib.conf`
-  - **Extract args tool**: Added `tools/extract_args/` with lexer to extract OCaml compiler arguments
-  - **Toplevel scripts**: Added `topfind_rd0.p` and `topfind_rd1.p` templates supporting both bytecode and native toplevel
-  - **OxCaml compatibility fix**: Modified `topfind.ml.in` to use explicit lambda `fun s -> prerr_endline s` instead of partial application with `ignore`, avoiding type inference issues with OxCaml's stricter typing
-  - **Opam packages**: Split into `findlib.opam` (library) and `ocamlfind.opam` (tool) packages
-  - **Runtime events support**: Added META template for OCaml 5.x runtime_events library
+  - **Dune port**: Added complete dune build system support including `dune-project`, `dune` files for `src/findlib`, `site-lib-src`, and `tools` directories
+  - **Build tooling**: Added `tools/discover.ml` using dune-configurator to generate `findlib_config.ml`, `topfind`, and `findlib.conf`
+  - **Build tooling**: Added `tools/extract_args/` with lexer for extracting OCaml compiler arguments
+  - **Opam files**: Added separate `findlib.opam` and `ocamlfind.opam` package definitions
+  - **OCaml 5+ compatibility**: Modified `findlib.ml` to default search path to `ocaml_stdlib` when no config provided, enabling discovery of standard library META files shipped with OCaml 5+
+  - **OxCaml compatibility**: Patched `topfind.ml.in` to use explicit lambdas (`fun s -> prerr_endline s` and `fun _ -> ()`) instead of partial application with `ignore`, fixing type inference issues with OxCaml
+  - **Toplevel scripts**: Added `topfind_rd0.p` and `topfind_rd1.p` template files for topfind generation with native/bytecode detection
+  - **Runtime events**: Added META file for OCaml 5's `runtime_events` library
+  - **Removed**: Deleted obsolete `src/bytes/META` (bytes compatibility shim no longer needed)
   </details>
 - **ocurl (0.10.0)**: Port from autoconf to dune build system and add new libcurl features including PREREQFUNCTION, AWS_SIGV4, TCP keepalive options, NOPROXY, bigstring write callbacks, and Multi.closesocket_function.
   <details><summary>Details</summary>
@@ -659,13 +660,30 @@ Packages with monorepo compatibility changes
   - Remove `src/.merlin` (IDE configuration file)
   - Add `opam` package metadata file
   </details>
-- **ocamlbuild**: Makefile and configuration fixes for `for-pack` tag propagation to bytecode compilation
+- **odoc (dev)**: Older pre-3.0.0 version pinned for monorepo compatibility, with OxCaml-specific type features removed and internal library exposure disabled
   <details><summary>Details</summary>
 
-  - **Makefile changes**: Split generic `%.cmo` and `%.cmi` pattern rules into directory-specific rules (`src/`, `bin/`, `plugin-lib/`) to ensure `src/` modules are compiled with `-for-pack Ocamlbuild_pack` flag for bytecode
-  - **Configuration fix** (`src/configuration.ml`): Added logic to propagate `for-pack(...)` tags from `.cmx` files to corresponding `.ml` and `.mli` files, ensuring pack configuration applies consistently to both native and bytecode compilation
-  - **Removed `.depend` file**: Generated dependency file removed from version control
-  - **Included `flambda2.patch`**: Contains the same Makefile and configuration changes as a patch file
+  - **Version difference**: Local is older (pre-3.0.0~beta1 "Unreleased") vs upstream 3.1.0
+  - **OCaml version constraint**: Changed from `< 5.5` to `< 5.4` for monorepo OCaml version compatibility
+  - **OxCaml features removed from local**: Upstream has `Quote`, `Splice`, and `Bivariant` variance types that are absent in local
+  - **Identifier handling**: Local uses non-optional identifiers where upstream uses `option` types
+  - **Opam flags**: Added `avoid-version` flag to prevent version solver issues
+  - **Dune version**: Downgraded from `3.21` to `3.7`
+  - **Sherlodoc libraries**: Removed `public_name` from db, query, and store libraries (keeping them internal)
+  - **Added `result` dependency**: Added explicit `result` package dependency
+  - **Removed `fpath` version constraint**: Changed from `>= 0.7.3` to no version constraint
+  - **Test suite changes**: Switched test dependencies from `tyxml` to `base` package
+  - **Utility functions**: Added local `utils.ml` in document module to avoid `Odoc_utils` dependency
+  - **Driver changes**: Modified voodoo driver and occurrence file handling
+  - **CSS/HTML fixes**: Minor fixes to CSS grid layout and KaTeX macro handling
+  </details>
+- **progress (0.5.0)**: Remove OCaml version conditionals to always use Dynarray-based implementation
+  <details><summary>Details</summary>
+
+  - Removes `enabled_if (>= %{ocaml_version} "5.2")` conditionals from dune rules
+  - Removes fallback rules for OCaml versions prior to 5.2 that used the `vector` library
+  - Always uses `pvector.dynarray.ml` implementation instead of conditionally selecting between dynarray and vector backends
+  - Removes dependency on external `vector` library for older OCaml versions
   </details>
 - **psq (0.2.1)**: Remove seq library dependency as it is now part of stdlib
   <details><summary>Details</summary>
@@ -682,13 +700,6 @@ Packages with monorepo compatibility changes
   - Add `loc_ghoster` object to mark generated code locations as ghost locations
   - Apply `loc_ghoster` transformation to all PPX-generated expressions and structures to avoid spurious location warnings
   - Include patch file documenting all modifications
-  </details>
-- **topkg**: Remove redundant string function declarations that shadow stdlib String module
-  <details><summary>Details</summary>
-
-  - Remove `val trim : string -> string` declaration from `topkg_string.mli` (already available via `include module type of String`)
-  - Remove `val uppercase_ascii : string -> string` declaration (already available via `include module type of String`)
-  - These declarations were redundant since the file includes `module type of String`, and removing them avoids shadowing warnings or conflicts with newer OCaml stdlib versions
   </details>
 - **tyxml (4.6.0)**: Remove seq library dependency as it is part of stdlib in OCaml 5.x
   <details><summary>Details</summary>
@@ -718,5 +729,5 @@ abstract_algebra, accessor, accessor_async, accessor_base, accessor_core, am_run
 
 Packages with no modifications from upstream
 
-angstrom (0.16.1), asn1-combinators (0.3.2), base64 (3.5.2), bigarray-compat (1.1.0), bigstringaf (0.10.0), ca-certs (1.0.1), camlp-streams, checkseum (0.5.2), cmdliner (1.3.0), cohttp (6.2.1), cppo (1.8.0), crowbar, crunch (4.0.0), cryptokit, csexp (1.5.2), cstruct (6.2.0), ctypes, decompress (1.5.3), digestif (1.3.0), domain-local-await (1.0.1), domain-name (0.5.0), dune-compiledb (0.6.0), either (1.0.0), eqaf (0.10), ezjsonm (1.3.0), faraday (0.8.2), fiber (3.7.0), fix, gmap (0.3.0), hex (1.5.0), httpaf (0.7.1), inotify (2.6), integers, iomux (0.4), ipaddr (5.6.1), jsonfeed (1.1.0), kdf (1.0.0), lambda-term (3.2.0), lambdasoup, lwt-dllist (1.1.0), magic-mime (1.3.1), markup, mew, mew_vi, mirage-crypto (2.0.2), num (1.7~dev), ocaml-syntax-shims (1.0.0), ocaml-version, ocamlgraph (2.0.0), ocp-indent (1.9.0), ocplib-endian, ohex, opam, opam-file-format (2.2.0), optint (0.3.0), owee (0.8), patch (3.1.0), pcre (8.0.5), pp (2.0.0), ppx_blob (0.9.0), ppx_derivers, progress (0.5.0), sha (1.15.4), sitemap (1.0), stdlib-shims (0.3.0), stringext (1.6.0), swhid_core, syndic (1.7.0), thread-table (1.0.0), tls (2.0.3), trie, uchar, uri (4.4.0), uring (2.7.0), x509 (1.0.6), yojson (2.2.2), zed
+angstrom (0.16.1), asn1-combinators (0.3.2), base64 (3.5.2), bigarray-compat (1.1.0), bigstringaf (0.10.0), ca-certs (1.0.1), camlp-streams, checkseum (0.5.2), cmdliner (1.3.0), cohttp (6.2.1), cppo (1.8.0), crowbar, crunch (4.0.0), cryptokit, csexp (1.5.2), cstruct (6.2.0), ctypes, decompress (1.5.3), digestif (1.3.0), domain-local-await (1.0.1), domain-name (0.5.0), dune-compiledb (0.6.0), eio, either (1.0.0), eqaf (0.10), ezjsonm (1.3.0), faraday (0.8.2), fiber (3.7.0), fix, gmap (0.3.0), hex (1.5.0), httpaf (0.7.1), inotify (2.6), integers, iomux (0.4), ipaddr (5.6.1), jsonfeed (1.1.0), kdf (1.0.0), lambda-term (3.2.0), lambdasoup, lwt-dllist (1.1.0), magic-mime (1.3.1), markup, mew, mew_vi, mirage-crypto (2.0.2), num (1.7~dev), ocaml-syntax-shims (1.0.0), ocaml-version, ocamlgraph (2.0.0), ocp-indent (1.9.0), ocplib-endian, ohex, opam, opam-file-format (2.2.0), optint (0.3.0), owee (0.8), patch (3.1.0), pcre (8.0.5), pp (2.0.0), ppx_blob (0.9.0), ppx_derivers, ppx_deriving (6.1.1), sha (1.15.4), sitemap (1.0), stdlib-shims (0.3.0), stringext (1.6.0), swhid_core, syndic (1.7.0), thread-table (1.0.0), tls (2.0.3), trie, uchar, uri (4.4.0), uring (2.7.0), x509 (1.0.6), yojson (2.2.2), zed
 

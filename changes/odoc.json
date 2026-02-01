@@ -1,0 +1,10 @@
+{
+  "name": "odoc",
+  "git_commit": "db29c38848a38bffef89b4a19223137be2205ee2",
+  "change_types": [
+    "compatibility",
+    "build-fix"
+  ],
+  "summary": "Older pre-3.0.0 version pinned for monorepo compatibility, with OxCaml-specific type features removed and internal library exposure disabled",
+  "details": "- **Version difference**: Local is older (pre-3.0.0~beta1 \"Unreleased\") vs upstream 3.1.0\n- **OCaml version constraint**: Changed from `< 5.5` to `< 5.4` for monorepo OCaml version compatibility\n- **OxCaml features removed from local**: Upstream has `Quote`, `Splice`, and `Bivariant` variance types that are absent in local\n- **Identifier handling**: Local uses non-optional identifiers where upstream uses `option` types\n- **Opam flags**: Added `avoid-version` flag to prevent version solver issues\n- **Dune version**: Downgraded from `3.21` to `3.7`\n- **Sherlodoc libraries**: Removed `public_name` from db, query, and store libraries (keeping them internal)\n- **Added `result` dependency**: Added explicit `result` package dependency\n- **Removed `fpath` version constraint**: Changed from `>= 0.7.3` to no version constraint\n- **Test suite changes**: Switched test dependencies from `tyxml` to `base` package\n- **Utility functions**: Added local `utils.ml` in document module to avoid `Odoc_utils` dependency\n- **Driver changes**: Modified voodoo driver and occurrence file handling\n- **CSS/HTML fixes**: Minor fixes to CSS grid layout and KaTeX macro handling"
+}
