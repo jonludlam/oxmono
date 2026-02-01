@@ -123,8 +123,28 @@ let render_sidenote ~entries c = function
       | None -> data_attrs
     in
 
+    let data_attrs = match twitter_handle contact with
+      | Some t -> data_attrs @ [Printf.sprintf {|data-twitter="%s"|} (html_escape_attr t)]
+      | None -> data_attrs
+    in
+
+    let data_attrs = match bluesky_handle contact with
+      | Some b -> data_attrs @ [Printf.sprintf {|data-bluesky="%s"|} (html_escape_attr b)]
+      | None -> data_attrs
+    in
+
+    let data_attrs = match mastodon_handle contact with
+      | Some m -> data_attrs @ [Printf.sprintf {|data-mastodon="%s"|} (html_escape_attr m)]
+      | None -> data_attrs
+    in
+
     let data_attrs = match orcid contact with
       | Some o -> data_attrs @ [Printf.sprintf {|data-orcid="%s"|} (html_escape_attr o)]
+      | None -> data_attrs
+    in
+
+    let data_attrs = match current_url contact with
+      | Some u -> data_attrs @ [Printf.sprintf {|data-url="%s"|} (html_escape_attr u)]
       | None -> data_attrs
     in
 

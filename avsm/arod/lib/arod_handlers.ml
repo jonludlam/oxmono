@@ -13,6 +13,50 @@ module Paper = Bushel.Paper
 
 let to_page el = Htmlit.El.to_string ~doctype:true el
 
+(* Response helpers that work with local_ respond - call respond with all args at once *)
+let[@inline] send_html (local_ respond) s =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "text/html; charset=utf-8")]
+    (R.String s)
+
+let[@inline] send_html_empty (local_ respond) =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "text/html; charset=utf-8")]
+    R.Empty
+
+let[@inline] send_atom (local_ respond) s =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "application/atom+xml; charset=utf-8")]
+    (R.String s)
+
+let[@inline] send_atom_empty (local_ respond) =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "application/atom+xml; charset=utf-8")]
+    R.Empty
+
+let[@inline] send_json (local_ respond) s =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "application/json; charset=utf-8")]
+    (R.String s)
+
+let[@inline] send_json_empty (local_ respond) =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, "application/json; charset=utf-8")]
+    R.Empty
+
+let[@inline] send_file (local_ respond) ~mime s =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, mime)]
+    (R.String s)
+
+let[@inline] send_file_empty (local_ respond) ~mime =
+  respond ~status:Httpz.Res.Success
+    ~headers:[(Httpz.Header_name.Content_type, mime)]
+    R.Empty
+
+let[@inline] not_found (local_ respond) =
+  respond ~status:Httpz.Res.Not_found ~headers:[] (R.String "Not Found")
+
 (** {1 File Serving} *)
 
 let mime_type_of_path path =
@@ -33,7 +77,7 @@ let mime_type_of_path path =
   else if String.ends_with ~suffix:".bib" path then "application/x-bibtex"
   else "application/octet-stream"
 
-let static_file ~dir path _ctx respond =
+let static_file ~dir path rctx (local_ respond) =
   let clean_path =
     let parts = String.split_on_char '/' path in
     let safe_parts = List.filter (fun s -> s <> ".." && s <> ".") parts in
@@ -42,119 +86,127 @@ let static_file ~dir path _ctx respond =
   let file_path = Filename.concat dir clean_path in
   try
     if Sys.file_exists file_path && not (Sys.is_directory file_path) then begin
-      let ic = open_in_bin file_path in
-      let len = in_channel_length ic in
-      let content = really_input_string ic len in
-      close_in ic;
       let mime = mime_type_of_path file_path in
-      R.respond_string respond ~status:Httpz.Res.Success ~headers:[(Httpz.Header_name.Content_type, mime)] content
+      if R.is_head rctx then
+        send_file_empty respond ~mime
+      else begin
+        let ic = open_in_bin file_path in
+        let len = in_channel_length ic in
+        let content = really_input_string ic len in
+        close_in ic;
+        send_file respond ~mime content
+      end
     end
-    else R.not_found respond
-  with _ -> R.not_found respond
+    else not_found respond
+  with _ -> not_found respond
 
 (** {1 Cached Handler Wrapper} *)
 
-let cached ~cache ~key f respond =
-  match Arod_cache.get cache key with
-  | Some html -> R.html respond html
-  | None ->
-    let html = f () in
-    Arod_cache.set cache key html;
-    R.html respond html
+let cached ~cache ~key rctx f (local_ respond) =
+  if R.is_head rctx then
+    send_html_empty respond
+  else
+    match Arod_cache.get cache key with
+    | Some html -> send_html respond html
+    | None ->
+      let html = f () in
+      Arod_cache.set cache key html;
+      send_html respond html
 
 (** {1 Cached Content Handlers} *)
 
-let index ~ctx ~cache _rctx respond =
+let index ~ctx ~cache rctx (local_ respond) =
   let key = "/" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx "index" with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
   ) respond
 
-let papers_list ~ctx ~cache _rctx respond =
+let papers_list ~ctx ~cache rctx (local_ respond) =
   let key = "/papers" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_entries ~ctx ~types:[`Paper])
   ) respond
 
-let paper ~ctx ~cache slug _rctx respond =
+let paper ~ctx ~cache slug rctx (local_ respond) =
   let cfg = Arod_ctx.config ctx in
   match slug with
   | slug when String.ends_with ~suffix:".pdf" slug ->
-    static_file ~dir:cfg.paths.static_dir ("papers/" ^ slug) _rctx respond
+    static_file ~dir:cfg.paths.static_dir ("papers/" ^ slug) rctx respond
   | slug when String.ends_with ~suffix:".bib" slug ->
     let paper_slug = Filename.chop_extension slug in
-    (match Arod_ctx.lookup ctx paper_slug with
-     | Some (`Paper p) -> R.plain respond (Paper.bib p)
-     | _ -> R.not_found respond)
+    begin match Arod_ctx.lookup ctx paper_slug with
+     | Some (`Paper p) -> R.plain_gen rctx respond (fun () -> Paper.bib p)
+     | _ -> not_found respond
+    end
   | _ ->
     let key = "/papers/" ^ slug in
-    cached ~cache ~key (fun () ->
+    cached ~cache ~key rctx (fun () ->
       match Arod_ctx.lookup ctx slug with
       | None -> ""
       | Some ent -> to_page (Arod_render.view_one ~ctx ent)
     ) respond
 
-let notes_list ~ctx ~cache _rctx respond =
+let notes_list ~ctx ~cache rctx (local_ respond) =
   let key = "/notes" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_news ~ctx ~types:[`Note])
   ) respond
 
-let note ~ctx ~cache slug _rctx respond =
+let note ~ctx ~cache slug rctx (local_ respond) =
   let key = "/notes/" ^ slug in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx slug with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
   ) respond
 
-let ideas_list ~ctx ~cache _rctx respond =
+let ideas_list ~ctx ~cache rctx (local_ respond) =
   let key = "/ideas" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_ideas_by_project ~ctx)
   ) respond
 
-let idea ~ctx ~cache slug _rctx respond =
+let idea ~ctx ~cache slug rctx (local_ respond) =
   let key = "/ideas/" ^ slug in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx slug with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
   ) respond
 
-let projects_list ~ctx ~cache _rctx respond =
+let projects_list ~ctx ~cache rctx (local_ respond) =
   let key = "/projects" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_projects_timeline ~ctx)
   ) respond
 
-let project ~ctx ~cache slug _rctx respond =
+let project ~ctx ~cache slug rctx (local_ respond) =
   let key = "/projects/" ^ slug in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx slug with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
   ) respond
 
-let videos_list ~ctx ~cache _rctx respond =
+let videos_list ~ctx ~cache rctx (local_ respond) =
   let key = "/videos" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_news ~ctx ~types:[`Video])
   ) respond
 
-let video ~ctx ~cache slug _rctx respond =
+let video ~ctx ~cache slug rctx (local_ respond) =
   let key = "/videos/" ^ slug in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx slug with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
   ) respond
 
-let content ~ctx ~cache slug _rctx respond =
+let content ~ctx ~cache slug rctx (local_ respond) =
   let key = "/content/" ^ slug in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     match Arod_ctx.lookup ctx slug with
     | None -> ""
     | Some ent -> to_page (Arod_render.view_one ~ctx ent)
@@ -162,150 +214,170 @@ let content ~ctx ~cache slug _rctx respond =
 
 (** {1 Legacy Handlers} *)
 
-let news_redirect slug _rctx respond =
+let news_redirect slug _rctx (local_ respond) =
   R.redirect respond ~status:Httpz.Res.Moved_permanently ~location:("/notes/" ^ slug)
 
-let wiki ~ctx ~cache _rctx respond =
+let wiki ~ctx ~cache rctx (local_ respond) =
   let key = "/wiki" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_entries ~ctx ~types:[`Paper; `Note; `Video; `Idea; `Project])
   ) respond
 
-let news ~ctx ~cache _rctx respond =
+let news ~ctx ~cache rctx (local_ respond) =
   let key = "/news" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_render.view_news ~ctx ~types:[`Note])
   ) respond
 
 (** {1 Feed Handlers} *)
 
-let atom_feed ~ctx ~cache rctx respond =
+(* Cached wrapper for atom feeds - uses atom content type *)
+let cached_atom ~cache ~key rctx f (local_ respond) =
+  if R.is_head rctx then
+    send_atom_empty respond
+  else
+    match Arod_cache.get cache key with
+    | Some xml -> send_atom respond xml
+    | None ->
+      let xml = f () in
+      Arod_cache.set cache key xml;
+      send_atom respond xml
+
+(* Cached wrapper for json feeds *)
+let cached_json ~cache ~key rctx f (local_ respond) =
+  if R.is_head rctx then
+    send_json_empty respond
+  else
+    match Arod_cache.get cache key with
+    | Some json -> send_json respond json
+    | None ->
+      let json = f () in
+      Arod_cache.set cache key json;
+      send_json respond json
+
+let atom_feed ~ctx ~cache rctx (local_ respond) =
   let path = R.path rctx in
   let key = "feed:" ^ path in
-  cached ~cache ~key (fun () ->
+  cached_atom ~cache ~key rctx (fun () ->
     let cfg = Arod_ctx.config ctx in
     let feed = Arod_render.get_entries ~ctx ~types:[] in
     Arod_feed.feed_string ~ctx cfg path feed
   ) respond
 
-let json_feed ~ctx ~cache _rctx respond =
+let json_feed ~ctx ~cache rctx (local_ respond) =
   let key = "feed:/feed.json" in
-  match Arod_cache.get cache key with
-  | Some json -> R.json respond json
-  | None ->
+  cached_json ~cache ~key rctx (fun () ->
     let cfg = Arod_ctx.config ctx in
     let feed = Arod_render.get_entries ~ctx ~types:[] in
-    let json = Arod_jsonfeed.feed_string ~ctx cfg "/feed.json" feed in
-    Arod_cache.set cache key json;
-    R.json respond json
+    Arod_jsonfeed.feed_string ~ctx cfg "/feed.json" feed
+  ) respond
 
-let perma_atom ~ctx ~cache _rctx respond =
+let perma_atom ~ctx ~cache rctx (local_ respond) =
   let key = "feed:/perma.xml" in
-  match Arod_cache.get cache key with
-  | Some xml -> R.atom respond xml
-  | None ->
+  cached_atom ~cache ~key rctx (fun () ->
     let cfg = Arod_ctx.config ctx in
     let feed = Arod_render.perma_entries ~ctx in
-    let xml = Arod_feed.feed_string ~ctx cfg "/perma.xml" feed in
-    Arod_cache.set cache key xml;
-    R.atom respond xml
+    Arod_feed.feed_string ~ctx cfg "/perma.xml" feed
+  ) respond
 
-let perma_json ~ctx ~cache _rctx respond =
+let perma_json ~ctx ~cache rctx (local_ respond) =
   let key = "feed:/perma.json" in
-  match Arod_cache.get cache key with
-  | Some json -> R.json respond json
-  | None ->
+  cached_json ~cache ~key rctx (fun () ->
     let cfg = Arod_ctx.config ctx in
     let feed = Arod_render.perma_entries ~ctx in
-    let json = Arod_jsonfeed.feed_string ~ctx cfg "/perma.json" feed in
-    Arod_cache.set cache key json;
-    R.json respond json
+    Arod_jsonfeed.feed_string ~ctx cfg "/perma.json" feed
+  ) respond
 
 (** {1 Utility Handlers (Dynamic - not cached)} *)
 
-let sitemap ~ctx _rctx respond =
-  let cfg = Arod_ctx.config ctx in
-  let all_feed =
-    Arod_ctx.all_entries ctx
-    |> List.sort Entry.compare
-    |> List.rev
-  in
-  let url_of_entry ent =
-    let lastmod = Entry.date ent in
-    let loc = cfg.site.base_url ^ Entry.site_url ent in
-    Sitemap.v ~lastmod loc
-  in
-  let sitemap_xml = List.map url_of_entry all_feed |> Sitemap.output in
-  R.xml respond sitemap_xml
+let sitemap ~ctx rctx (local_ respond) =
+  R.xml_gen rctx respond (fun () ->
+    let cfg = Arod_ctx.config ctx in
+    let all_feed =
+      Arod_ctx.all_entries ctx
+      |> List.sort Entry.compare
+      |> List.rev
+    in
+    let url_of_entry ent =
+      let lastmod = Entry.date ent in
+      let loc = cfg.site.base_url ^ Entry.site_url ent in
+      Sitemap.v ~lastmod loc
+    in
+    List.map url_of_entry all_feed |> Sitemap.output
+  )
 
-let bushel_graph ~ctx ~cache _rctx respond =
+let bushel_graph ~ctx ~cache rctx (local_ respond) =
   let key = "/bushel" in
-  cached ~cache ~key (fun () ->
+  cached ~cache ~key rctx (fun () ->
     to_page (Arod_page.bushel_graph ~ctx ())
   ) respond
 
-let bushel_graph_data ~ctx _rctx respond =
-  let entries = Arod_ctx.entries ctx in
-  match Bushel.Link_graph.get_graph () with
-  | None -> R.json respond {|{"error": "Link graph not initialized"}|}
-  | Some graph ->
-    let json = Bushel.Link_graph.to_json graph entries in
-    R.json respond (Ezjsonm.value_to_string json)
+let bushel_graph_data ~ctx rctx (local_ respond) =
+  R.json_gen rctx respond (fun () ->
+    let entries = Arod_ctx.entries ctx in
+    match Bushel.Link_graph.get_graph () with
+    | None -> {|{"error": "Link graph not initialized"}|}
+    | Some graph ->
+      let json = Bushel.Link_graph.to_json graph entries in
+      Ezjsonm.value_to_string json
+  )
 
-let pagination_api ~ctx rctx respond =
-  try
-    let collection_type =
-      match R.query_param rctx "collection" with
-      | Some t -> t
-      | None -> failwith "Missing collection parameter"
-    in
-    let offset =
-      match R.query_param rctx "offset" with
-      | Some o -> int_of_string o
-      | None -> 0
-    in
-    let limit =
-      match R.query_param rctx "limit" with
-      | Some l -> int_of_string l
-      | None -> 25
-    in
-    let type_strings = R.query_params rctx "type" in
-    let types = List.filter_map Arod_render.entry_type_of_string type_strings in
-    let all_items = Arod_render.get_entries ~ctx ~types in
-    let total = List.length all_items in
-    let slice =
-      all_items
-      |> (fun l -> List.filteri (fun i _ -> i >= offset) l)
-      |> (fun l -> List.filteri (fun i _ -> i < limit) l)
-    in
-    let has_more = offset + List.length slice < total in
-    let render_fn = match collection_type with
-      | "feed" -> Arod_render.render_feeds_html ~ctx
-      | "entries" -> Arod_render.render_entries_html ~ctx
-      | _ -> failwith "Invalid collection type"
-    in
-    let rendered_html = render_fn slice in
-    let json =
-      `O [
-        ("html", `String rendered_html);
-        ("total", `Float (float_of_int total));
-        ("offset", `Float (float_of_int offset));
-        ("limit", `Float (float_of_int limit));
-        ("has_more", `Bool has_more);
-      ]
-    in
-    R.json respond (Ezjsonm.to_string json)
-  with e ->
-    let error_json = `O [ ("error", `String (Printexc.to_string e)) ] in
-    R.json respond (Ezjsonm.to_string error_json)
+let pagination_api ~ctx rctx (local_ respond) =
+  R.json_gen rctx respond (fun () ->
+    try
+      let collection_type =
+        match R.query_param rctx "collection" with
+        | Some t -> t
+        | None -> failwith "Missing collection parameter"
+      in
+      let offset =
+        match R.query_param rctx "offset" with
+        | Some o -> int_of_string o
+        | None -> 0
+      in
+      let limit =
+        match R.query_param rctx "limit" with
+        | Some l -> int_of_string l
+        | None -> 25
+      in
+      let type_strings = R.query_params rctx "type" in
+      let types = List.filter_map Arod_render.entry_type_of_string type_strings in
+      let all_items = Arod_render.get_entries ~ctx ~types in
+      let total = List.length all_items in
+      let slice =
+        all_items
+        |> (fun l -> List.filteri (fun i _ -> i >= offset) l)
+        |> (fun l -> List.filteri (fun i _ -> i < limit) l)
+      in
+      let has_more = offset + List.length slice < total in
+      let render_fn = match collection_type with
+        | "feed" -> Arod_render.render_feeds_html ~ctx
+        | "entries" -> Arod_render.render_entries_html ~ctx
+        | _ -> failwith "Invalid collection type"
+      in
+      let rendered_html = render_fn slice in
+      let json =
+        `O [
+          ("html", `String rendered_html);
+          ("total", `Float (float_of_int total));
+          ("offset", `Float (float_of_int offset));
+          ("limit", `Float (float_of_int limit));
+          ("has_more", `Bool has_more);
+        ]
+      in
+      Ezjsonm.to_string json
+    with e ->
+      let error_json = `O [ ("error", `String (Printexc.to_string e)) ] in
+      Ezjsonm.to_string error_json
+  )
 
-let well_known ~ctx key _rctx respond =
+let well_known ~ctx key rctx (local_ respond) =
   let cfg = Arod_ctx.config ctx in
   match List.find_opt (fun e -> e.Arod_config.key = key) cfg.well_known with
-  | Some entry -> R.plain respond entry.value
-  | None -> R.not_found respond
+  | Some entry -> R.plain_gen rctx respond (fun () -> entry.value)
+  | None -> not_found respond
 
-let robots_txt ~ctx rctx respond =
+let robots_txt ~ctx rctx (local_ respond) =
   let cfg = Arod_ctx.config ctx in
   static_file ~dir:cfg.paths.assets_dir "robots.txt" rctx respond
 

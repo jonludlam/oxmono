@@ -63,13 +63,14 @@ val create_conn : ([> [> `Generic ] Eio.Net.stream_socket_ty ] as 'a) Eio.Net.st
 
 val make_respond :
   ([> [> `Generic ] Eio.Net.stream_socket_ty ] as 'a) conn ->
+  is_head:bool ->
   keep_alive:bool ->
   Httpz.Version.t ->
   status:Httpz.Res.status ->
   headers:local_ Httpz_server.Route.resp_header list ->
   Httpz_server.Route.body ->
   unit
-(** [make_respond conn ~keep_alive version ~status ~headers body] writes
+(** [make_respond conn ~is_head ~keep_alive version ~status ~headers body] writes
     an HTTP response to the connection.
 
     This function is used as the [respond] callback for route handlers.
@@ -78,6 +79,8 @@ val make_respond :
     - Content-Length calculation
     - Connection header based on [keep_alive]
     - Body transmission (string, bigstring, or streaming)
+    - For HEAD requests ([is_head = true]), sends headers with Content-Length
+      but suppresses the body
 
     {b Note:} Typically called indirectly via {!Httpz_server.Route} helpers
     like [html], [json], etc. Direct use is for advanced scenarios. *)

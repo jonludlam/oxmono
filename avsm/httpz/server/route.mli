@@ -64,7 +64,15 @@ val stream : local_ respond -> status:Httpz.Res.status -> ?headers:local_ resp_h
 (** {1 Request Context} *)
 
 type ctx
-(** Request context providing access to path and query. *)
+(** Request context providing access to path, query, and HTTP method. *)
+
+val meth : ctx -> Httpz.Method.t
+(** Get the HTTP method of the request. *)
+
+val is_head : ctx -> bool
+(** Returns [true] if this is a HEAD request. Use this to skip expensive
+    body generation - the routing layer automatically matches HEAD requests
+    to GET routes. *)
 
 val path : ctx -> string
 (** Get request path as string (e.g., "/users/123"). *)
@@ -77,6 +85,17 @@ val query_params : ctx -> string -> string list
 
 val query : ctx -> (string * string) list
 (** Get all query parameters. *)
+
+(** {2 Lazy Response Helpers}
+
+    These variants skip body generation for HEAD requests. The thunk is only
+    called for non-HEAD requests. Use these when body generation is expensive. *)
+
+val html_gen : ctx -> local_ respond -> (unit -> string) -> unit
+val json_gen : ctx -> local_ respond -> (unit -> string) -> unit
+val xml_gen : ctx -> local_ respond -> (unit -> string) -> unit
+val atom_gen : ctx -> local_ respond -> (unit -> string) -> unit
+val plain_gen : ctx -> local_ respond -> (unit -> string) -> unit
 
 (** {1 Path Patterns} *)
 

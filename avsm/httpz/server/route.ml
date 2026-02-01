@@ -62,9 +62,13 @@ let[@inline] stream (local_ respond) ~status ?(local_ headers = []) ?length iter
 
 type ctx = {
   buf : bytes;
+  meth : Httpz.Method.t;
   segments : string list;
   query : Httpz.Span.t;
 }
+
+let[@inline] meth ctx = ctx.meth
+let[@inline] is_head ctx = Poly.equal ctx.meth Httpz.Method.Head
 
 let[@inline] path ctx =
   "/" ^ String.concat ~sep:"/" ctx.segments
@@ -81,6 +85,61 @@ let query_params ctx name =
   |> List.rev
 
 let[@inline] query ctx = Httpz.Target.query_to_string_pairs ctx.buf ctx.query
+
+(** {2 Lazy Response Helpers}
+
+    These variants skip body generation for HEAD requests. Pass a thunk that
+    generates the body; it will only be called for non-HEAD requests. *)
+
+let[@inline] html_gen ctx (local_ respond) f =
+  if Poly.equal ctx.meth Httpz.Method.Head then
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "text/html; charset=utf-8")]
+      Empty
+  else
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "text/html; charset=utf-8")]
+      (String (f ()))
+
+let[@inline] json_gen ctx (local_ respond) f =
+  if Poly.equal ctx.meth Httpz.Method.Head then
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/json; charset=utf-8")]
+      Empty
+  else
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/json; charset=utf-8")]
+      (String (f ()))
+
+let[@inline] xml_gen ctx (local_ respond) f =
+  if Poly.equal ctx.meth Httpz.Method.Head then
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/xml")]
+      Empty
+  else
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/xml")]
+      (String (f ()))
+
+let[@inline] atom_gen ctx (local_ respond) f =
+  if Poly.equal ctx.meth Httpz.Method.Head then
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/atom+xml; charset=utf-8")]
+      Empty
+  else
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "application/atom+xml; charset=utf-8")]
+      (String (f ()))
+
+let[@inline] plain_gen ctx (local_ respond) f =
+  if Poly.equal ctx.meth Httpz.Method.Head then
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "text/plain")]
+      Empty
+  else
+    respond ~status:Httpz.Res.Success
+      ~headers:[(Httpz.Header_name.Content_type, "text/plain")]
+      (String (f ()))
 
 (** {1 Path Patterns} *)
 
@@ -237,7 +296,12 @@ let of_list routes =
 
 let[@inline] try_route (Route { meth = route_meth; pat; hdr; handler })
     meth (local_ req_headers) segments ctx (local_ respond) =
-  if not (Poly.equal meth route_meth) then false
+  (* HEAD matches GET routes - handlers can check ctx.meth to skip body generation *)
+  let method_matches =
+    Poly.equal meth route_meth ||
+    (Poly.equal meth Httpz.Method.Head && Poly.equal route_meth Httpz.Method.Get)
+  in
+  if not method_matches then false
   else
     let _prefix, suffix = split_pat pat in
     match match_suffix suffix segments with
@@ -281,5 +345,5 @@ let parse_segments path =
 let dispatch buf ~meth ~(target : Httpz.Target.t) ~(local_ headers : Httpz.Header.t list) (t : t) ~(local_ respond) =
   let path_str = Httpz.Span.to_string buf (Httpz.Target.path target) in
   let segments = parse_segments path_str in
-  let ctx = { buf; segments; query = Httpz.Target.query target } in
+  let ctx = { buf; meth; segments; query = Httpz.Target.query target } in
   dispatch_walk t meth headers segments ctx respond
