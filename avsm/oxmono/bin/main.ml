@@ -131,14 +131,18 @@ let sync_one_package ~env ~fs ~cwd ~wt_path (name, source) =
   let target_dir = Eio.Path.(fs / wt_path / name) in
   let* () = match source with
     | Oxmono.Source.Git { url; commit } ->
-      Oxmono.Git.clone_or_update ~env ~url ~target:target_dir ~commit
+      Oxmono.Git.fetch_and_extract ~env ~url ~commit ~target:target_dir
     | Oxmono.Source.Archive { url; checksum } ->
       Oxmono.Archive.fetch_and_extract ~env ~url ~checksum ~target:target_dir
   in
   Oxmono.Worktree.commit_package ~env ~cwd ~package_name:name
 
 let sync_cmd =
-  let run () =
+  let package_name =
+    let doc = "Name of a specific package to sync. If omitted, syncs all packages." in
+    Arg.(value & pos 0 (some string) None & info [] ~docv:"PACKAGE" ~doc)
+  in
+  let run () package_name =
     Eio_main.run @@ fun env ->
     let open Result_syntax in
     let fs = Eio.Stdenv.fs env in
@@ -148,7 +152,14 @@ let sync_cmd =
       Oxmono.Sources_file.load ~fs Oxmono.Sources_file.sources_filename
       |> Result.map_error (Printf.sprintf "Failed to load sources.yaml: %s")
     in
-    let packages = Oxmono.Source.packages sources in
+    let all_packages = Oxmono.Source.packages sources in
+    let* packages = match package_name with
+      | None -> Ok all_packages
+      | Some name ->
+        match List.find_opt (fun (n, _) -> n = name) all_packages with
+        | Some pkg -> Ok [pkg]
+        | None -> Error (Printf.sprintf "Package '%s' not found in sources.yaml" name)
+    in
     if packages = [] then begin
       Log.app (fun m -> m "No packages in sources.yaml");
       Ok 0
@@ -170,9 +181,9 @@ let sync_cmd =
       in
       Ok (if errors > 0 then 1 else 0)
   in
-  let doc = "Sync all packages from sources.yaml" in
+  let doc = "Sync packages from sources.yaml" in
   let info = Cmd.info "sync" ~doc in
-  Cmd.v info Term.(const run $ logging_t)
+  Cmd.v info Term.(const run $ logging_t $ package_name)
 
 (** {1 Diff Command} *)
 

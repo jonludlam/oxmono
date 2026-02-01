@@ -705,8 +705,8 @@ packages:
       checksum: sha256=6762322f5a67a396977c7b6e2aa9d10863b6cfd325f98261be36cfe924c9f9e9
   ppx_deriving:
     git:
-      url: 'git+https://github.com/patricoferris/ppx_deriving.git#4cb09f54ff13e525804852190bfed8abb9267014'
-      commit: HEAD
+      url: 'https://github.com/patricoferris/ppx_deriving.git'
+      commit: 4cb09f54ff13e525804852190bfed8abb9267014
   ppx_derivers:
     archive:
       url: 'https://github.com/ocaml-ppx/ppx_derivers/archive/1.2.1.tar.gz'
@@ -889,8 +889,8 @@ packages:
       checksum: sha256=1310ab9054565992ac9a797b2cbee974f80d779661c1faa12c97308653edcc1a
   odoc:
     git:
-      url: 'git+https://github.com/oxcaml/odoc.git#97e1daecb432d33a7137d525f7a554f203073a95'
-      commit: HEAD
+      url: 'https://github.com/art-w/odoc.git'
+      commit: bb20ded6984bf1a0b031c48eb0a474aa53cf256b
   ocplib-endian:
     archive:
       url: 'https://github.com/OCamlPro/ocplib-endian/archive/refs/tags/1.2.tar.gz'
@@ -1337,8 +1337,8 @@ packages:
       checksum: sha256=bf674de3312dee7b7215f07df1e8a96eb3d679164b8a918cdd95b8d97e505884
   eio:
     git:
-      url: 'git+https://github.com/oxcaml/eio.git#7de26f5331f1e7aac1c086a5ebe849dd940b5c3e'
-      commit: HEAD
+      url: 'https://github.com/avsm/eio.git'
+      commit: 7de26f5331f1e7aac1c086a5ebe849dd940b5c3e
   ecaml:
     archive:
       url: 'https://github.com/janestreet/ecaml/archive/bc0d0086888d25a2ac02a9a133196dbf623e24b8.tar.gz'
