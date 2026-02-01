@@ -10,7 +10,7 @@ module N = Bushel.Note
 module C = Sortal_schema.Contact
 module X = Syndic.Atom
 
-let anil_copyright = "(c) 1998-2025 Anil Madhavapeddy, all rights reserved"
+let anil_copyright = "(c) 1998-2026 Anil Madhavapeddy, all rights reserved"
 
 let author c =
   let uri = Option.map Uri.of_string (C.best_url c) in
