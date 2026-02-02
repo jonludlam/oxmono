@@ -57,7 +57,7 @@ let int dst ~(off : int16#) n =
     let mutable p = off_int + digits - 1 in
     let mutable remaining = n in
     while remaining > 0 do
-      Bytes.unsafe_set dst p (Char.of_int_exn (48 + Int.rem remaining 10));
+      Bytes.unsafe_set dst p (Stdlib.Char.unsafe_chr (48 + Int.rem remaining 10));
       remaining <- remaining / 10;
       p <- p - 1
     done;
@@ -84,7 +84,7 @@ let int64 dst ~(off : int16#) (n : int64#) =
     let mutable remaining = n in
     while Int64.(remaining > 0L) do
       let digit = Int64.(remaining % 10L) |> Int64.to_int_exn in
-      Bytes.unsafe_set dst p (Char.of_int_exn (48 + digit));
+      Bytes.unsafe_set dst p (Stdlib.Char.unsafe_chr (48 + digit));
       remaining <- Int64.(remaining / 10L);
       p <- p - 1
     done;
@@ -119,16 +119,16 @@ let hex dst ~(off : int16#) n =
 
 let[@inline] digit2 dst ~(off : int16#) n =
   let off_int = to_int off in
-  Bytes.unsafe_set dst off_int (Char.of_int_exn (48 + n / 10));
-  Bytes.unsafe_set dst (off_int + 1) (Char.of_int_exn (48 + n % 10));
+  Bytes.unsafe_set dst off_int (Stdlib.Char.unsafe_chr (48 + n / 10));
+  Bytes.unsafe_set dst (off_int + 1) (Stdlib.Char.unsafe_chr (48 + n % 10));
   add16 off (i16 2)
 ;;
 
 let[@inline] digit4 dst ~(off : int16#) n =
   let off_int = to_int off in
-  Bytes.unsafe_set dst off_int (Char.of_int_exn (48 + n / 1000));
-  Bytes.unsafe_set dst (off_int + 1) (Char.of_int_exn (48 + (n / 100) % 10));
-  Bytes.unsafe_set dst (off_int + 2) (Char.of_int_exn (48 + (n / 10) % 10));
-  Bytes.unsafe_set dst (off_int + 3) (Char.of_int_exn (48 + n % 10));
+  Bytes.unsafe_set dst off_int (Stdlib.Char.unsafe_chr (48 + n / 1000));
+  Bytes.unsafe_set dst (off_int + 1) (Stdlib.Char.unsafe_chr (48 + (n / 100) % 10));
+  Bytes.unsafe_set dst (off_int + 2) (Stdlib.Char.unsafe_chr (48 + (n / 10) % 10));
+  Bytes.unsafe_set dst (off_int + 3) (Stdlib.Char.unsafe_chr (48 + n % 10));
   add16 off (i16 4)
 ;;

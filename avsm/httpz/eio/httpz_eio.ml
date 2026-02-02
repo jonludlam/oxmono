@@ -212,7 +212,7 @@ let handle_request conn ~routes ~on_request =
       (* Update keep_alive before dispatch *)
       conn.keep_alive <- req.#keep_alive;
       (* Check if this is a HEAD request for body suppression *)
-      let is_head = Poly.equal meth Httpz.Method.Head in
+      let is_head = phys_equal meth Httpz.Method.Head in
       (* Create respond function and track status for logging *)
       let logged_status = ref Httpz.Res.Success in
       let respond ~status ~headers body =

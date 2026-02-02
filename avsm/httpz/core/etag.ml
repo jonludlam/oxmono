@@ -7,6 +7,10 @@ module I16 = Stdlib_stable.Int16_u
 let[@inline always] i16 x = I16.of_int x
 let[@inline always] to_int x = I16.to_int x
 
+(* Unboxed char helpers - use Buf_read's primitives *)
+let[@inline always] peek buf pos = Buf_read.peek buf (i16 pos)
+let ( =. ) = Buf_read.( =. )
+
 (* Entity tag - unboxed record pointing into buffer *)
 type t =
   #{ weak : bool
@@ -33,11 +37,11 @@ let parse (local_ buf) (sp : Span.t) : #(status * t) =
   let len = Span.len sp in
   if len < 2 then #(Invalid, empty)  (* Minimum: "" *)
   else
-    let c0 = Bytes.unsafe_get buf off in
-    let c1 = Bytes.unsafe_get buf (off + 1) in
+    let c0 = peek buf off in
+    let c1 = peek buf (off + 1) in
     (* Check for weak indicator W/ *)
     let weak, quote_start =
-      if Char.equal c0 'W' && Char.equal c1 '/' && len >= 4 then
+      if c0 =. #'W' && c1 =. #'/' && len >= 4 then
         (true, off + 2)
       else
         (false, off)
@@ -45,9 +49,9 @@ let parse (local_ buf) (sp : Span.t) : #(status * t) =
     let remaining = len - (quote_start - off) in
     if remaining < 2 then #(Invalid, empty)
     else
-      let first = Bytes.unsafe_get buf quote_start in
-      let last = Bytes.unsafe_get buf (quote_start + remaining - 1) in
-      if Char.equal first '"' && Char.equal last '"' then
+      let first = peek buf quote_start in
+      let last = peek buf (quote_start + remaining - 1) in
+      if first =. #'"' && last =. #'"' then
         let tag_off = quote_start + 1 in
         let tag_len = remaining - 2 in
         #(Valid, #{ weak; off = i16 tag_off; len = i16 tag_len })
@@ -71,13 +75,10 @@ type match_condition =
   | Tags
   | Empty
 
-(* Skip optional whitespace *)
+(* Skip optional whitespace using unboxed char operations *)
 let[@inline] skip_ows buf ~pos ~len =
   let mutable p = pos in
-  while p < len && (
-    let c = Bytes.unsafe_get buf p in
-    Char.equal c ' ' || Char.equal c '\t'
-  ) do
+  while p < len && Buf_read.is_space (peek buf p) do
     p <- p + 1
   done;
   p
@@ -91,7 +92,7 @@ let parse_match_header (local_ buf) (sp : Span.t) (tags : t array) : #(match_con
   (* Skip leading whitespace *)
   let start = skip_ows buf ~pos:off ~len:end_pos in
   if start >= end_pos then #(Empty, i16 0)
-  else if Char.equal (Bytes.unsafe_get buf start) '*' then
+  else if peek buf start =. #'*' then
     (* Check it's just "*" possibly with trailing whitespace *)
     let after_star = skip_ows buf ~pos:(start + 1) ~len:end_pos in
     if after_star >= end_pos then #(Any, i16 0) else #(Empty, i16 0)
@@ -109,17 +110,14 @@ let parse_match_header (local_ buf) (sp : Span.t) (tags : t array) : #(match_con
         let tag_start = pos in
         let mutable tag_end = pos in
         let mutable in_quote = false in
-        while tag_end < end_pos && (in_quote || not (Char.equal (Bytes.unsafe_get buf tag_end) ',')) do
-          if Char.equal (Bytes.unsafe_get buf tag_end) '"' then
+        while tag_end < end_pos && (in_quote || not (peek buf tag_end =. #',')) do
+          if peek buf tag_end =. #'"' then
             in_quote <- not in_quote;
           tag_end <- tag_end + 1
         done;
         (* Trim trailing whitespace from tag *)
         let mutable trimmed_end = tag_end in
-        while trimmed_end > tag_start && (
-          let c = Bytes.unsafe_get buf (trimmed_end - 1) in
-          Char.equal c ' ' || Char.equal c '\t'
-        ) do
+        while trimmed_end > tag_start && Buf_read.is_space (peek buf (trimmed_end - 1)) do
           trimmed_end <- trimmed_end - 1
         done;
         let tag_span = Span.make ~off:(i16 tag_start) ~len:(i16 (trimmed_end - tag_start)) in
@@ -130,7 +128,7 @@ let parse_match_header (local_ buf) (sp : Span.t) (tags : t array) : #(match_con
           count <- count + 1
         | Invalid -> ());
         (* Skip comma if present *)
-        if tag_end < end_pos && Char.equal (Bytes.unsafe_get buf tag_end) ',' then
+        if tag_end < end_pos && peek buf tag_end =. #',' then
           pos <- tag_end + 1
         else
           pos <- tag_end
@@ -138,12 +136,12 @@ let parse_match_header (local_ buf) (sp : Span.t) (tags : t array) : #(match_con
     if count > 0 then #(Tags, i16 count) else #(Empty, i16 0)
 ;;
 
-(* Manual string comparison at two offsets *)
+(* Manual string comparison at two offsets using unboxed char operations *)
 let[@inline] compare_at_offsets (local_ buf : bytes) ~pos1 ~pos2 ~len =
   let mutable i = 0 in
   let mutable eq = true in
   while eq && i < len do
-    if not (Char.equal (Bytes.unsafe_get buf (pos1 + i)) (Bytes.unsafe_get buf (pos2 + i)))
+    if not (peek buf (pos1 + i) =. peek buf (pos2 + i))
     then eq <- false
     else i <- i + 1
   done;

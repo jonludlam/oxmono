@@ -139,6 +139,18 @@ val is_token_char : char# -> bool
 val is_space : char# -> bool
 (** [is_space c] returns [true] if [c] is SP (space) or HTAB (tab). *)
 
+val is_digit : char# -> bool
+(** [is_digit c] returns [true] if [c] is an ASCII digit 0-9. *)
+
+val digit_value : char# -> int
+(** [digit_value c] returns the numeric value 0-9 if [c] is a digit,
+    or -1 if [c] is not a digit. *)
+
+val skip_ows : local_ bytes -> pos:int16# -> len:int16# -> int16#
+(** [skip_ows buf ~pos ~len] skips optional whitespace (SP/HTAB) starting
+    at [pos] and returns the position of the first non-whitespace character.
+    Returns [len] if only whitespace remains. *)
+
 val to_lower : char# -> char#
 (** [to_lower c] converts ASCII uppercase to lowercase. *)
 

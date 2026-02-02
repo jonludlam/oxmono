@@ -97,7 +97,7 @@ let[@inline] build_request ~meth ~target ~version ~(body_off : int16#)
     match st.#conn with
     | Conn_close -> false
     | Conn_keep_alive -> true
-    | Conn_default -> Poly.( = ) version Version.Http_1_1
+    | Conn_default -> phys_equal version Version.Http_1_1
   in
   let req =
     #{ Req.meth

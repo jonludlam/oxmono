@@ -6,6 +6,13 @@ module I16 = Stdlib_stable.Int16_u
 module I64 = Stdlib_upstream_compatible.Int64_u
 module Char_u = Stdlib_stable.Char_u
 
+let[@inline always] i16 x = I16.of_int x
+
+(* Unboxed char helpers *)
+let[@inline always] peek buf pos = Buf_read.peek buf (i16 pos)
+let[@inline always] peek_str s i = Char_u.of_char (String.unsafe_get s i)
+let ( =. ) = Buf_read.( =. )
+
 (* Span with int16# fields - sufficient for 32KB max buffer. *)
 type t =
   #{ off : int16#
@@ -27,7 +34,7 @@ let[@inline] equal (local_ buf : bytes) (sp : t) s =
     let mutable i = 0 in
     let mutable eq = true in
     while eq && i < slen do
-      if not (Char.equal (Bytes.unsafe_get buf (sp_off + i)) (String.unsafe_get s i))
+      if not (peek buf (sp_off + i) =. peek_str s i)
       then eq <- false
       else i <- i + 1
     done;
@@ -43,8 +50,8 @@ let[@inline] equal_caseless (local_ buf : bytes) (sp : t) s =
     let mutable eq = true in
     let sp_off = off sp in
     while eq && i < slen do
-      let b1 = Char.to_int (Bytes.unsafe_get buf (sp_off + i)) in
-      let b2 = Char.to_int (String.unsafe_get s i) in
+      let b1 = Char_u.code (peek buf (sp_off + i)) in
+      let b2 = Char_u.code (peek_str s i) in
       let lower_b1 = if b1 >= 65 && b1 <= 90 then b1 + 32 else b1 in
       if lower_b1 <> b2 then eq <- false
       else i <- i + 1

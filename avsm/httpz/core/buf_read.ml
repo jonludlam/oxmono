@@ -67,6 +67,29 @@ let[@inline always] is_space (c : char#) =
   | _ -> false
 ;;
 
+let[@inline always] is_digit (c : char#) =
+  match c with
+  | #'0' .. #'9' -> true
+  | _ -> false
+;;
+
+(* Returns digit value 0-9, or -1 if not a digit *)
+let[@inline always] digit_value (c : char#) : int =
+  match c with
+  | #'0' .. #'9' -> Char_u.code c - 48
+  | _ -> -1
+;;
+
+(* Skip optional whitespace (OWS = SP / HTAB) *)
+let[@inline always] skip_ows (local_ buf : bytes) ~(pos : int16#) ~(len : int16#) : int16# =
+  let mutable p = to_int pos in
+  let len = to_int len in
+  while p < len && is_space (peek buf (i16 p)) do
+    p <- p + 1
+  done;
+  i16 p
+;;
+
 let[@inline always] to_lower (c : char#) : char# =
   match c with
   | #'A' .. #'Z' -> Char_u.chr (Char_u.code c + 32)
@@ -88,10 +111,10 @@ let find_crlf_check_bare_cr (local_ buf : bytes) ~(pos : int16#) ~(len : int16#)
     let mutable found_bare_cr = false in
     let last_check = len - 2 in
     while (not found_crlf) && p <= last_check do
-      let c = Bytes.unsafe_get buf p in
-      if Char.equal c '\r' then (
+      let c = peek buf (i16 p) in
+      if c =. #'\r' then (
         (* Check if followed by LF *)
-        if Char.equal (Bytes.unsafe_get buf (p + 1)) '\n'
+        if peek buf (i16 (p + 1)) =. #'\n'
         then found_crlf <- true  (* Valid CRLF - stop here *)
         else (
           found_bare_cr <- true;  (* Bare CR detected *)
@@ -102,7 +125,7 @@ let find_crlf_check_bare_cr (local_ buf : bytes) ~(pos : int16#) ~(len : int16#)
     done;
     (* Check final position for lone CR at end *)
     if (not found_crlf) && (not found_bare_cr) && p = last_check + 1 && p < len then (
-      if Char.equal (Bytes.unsafe_get buf p) '\r' then
+      if peek buf (i16 p) =. #'\r' then
         found_bare_cr <- true
     );
     let crlf_pos = if found_crlf then i16 p else i16 (-1) in
