@@ -2368,13 +2368,13 @@ let apply_inner_substs env (sg : Component.Signature.t) : Component.Signature.t
         in
         match fragmap env subst { sg with items = rest } with
         | Ok sg' -> sg'.items
-        | Error _ -> rest)
+        | Error e ->
+            Format.eprintf "apply_inner_substs: %a@."
+              Errors.Tools_error.pp (e :> Errors.Tools_error.any);
+            failwith "error")
     | Component.Signature.ModuleSubstitution (id, modsubst) :: rest -> (
-        let subst =
-          Component.ModuleType.ModuleSubst
-            (`Dot (`Root, Ident.Name.module_ id), modsubst.manifest)
-        in
-        let rest =
+        let inner_rest = inner rest in
+        let fake_module =
           Component.Signature.Module
             ( id,
               Ordinary,
@@ -2387,11 +2387,32 @@ let apply_inner_substs env (sg : Component.Signature.t) : Component.Signature.t
                     canonical = None;
                     hidden = false;
                   }) )
-          :: inner rest
         in
-        match fragmap env subst { sg with items = rest } with
+        let subst =
+          Component.ModuleType.ModuleSubst
+            (`Dot (`Root, Ident.Name.module_ id), modsubst.manifest)
+        in
+        match fragmap env subst { sg with items = fake_module :: inner_rest } with
         | Ok sg' -> sg'.items
-        | Error _ -> rest)
+        | Error _ ->
+            (* fragmap failed, likely because modsubst.manifest contains
+               Local identifiers that can't be resolved through the
+               environment. Apply the substitution directly using whatever
+               resolved path we can extract from the manifest. *)
+            let rp =
+              match modsubst.manifest with
+              | `Local (local_id, _) -> (`Local local_id : Cpath.Resolved.module_)
+              | `Resolved rp -> rp
+              | _ -> failwith "apply_inner_substs: ModuleSubstitution with unresolvable manifest"
+            in
+            let sub =
+              Subst.add_module
+                (id :> Ident.module_)
+                (`Resolved rp) rp Subst.identity
+            in
+            (* Apply substitution to inner_rest (without the fake module,
+               since the module substitution removes it from the signature) *)
+            Subst.apply_sig_map_items sub inner_rest)
     | Component.Signature.ModuleTypeSubstitution (id, modtypesubst) :: rest -> (
         let subst =
           Component.ModuleType.ModuleTypeSubst
@@ -2412,7 +2433,10 @@ let apply_inner_substs env (sg : Component.Signature.t) : Component.Signature.t
         in
         match fragmap env subst { sg with items = rest } with
         | Ok sg' -> sg'.items
-        | Error _ -> rest)
+        | Error e ->
+            Format.eprintf "apply_inner_substs: %a@."
+              Errors.Tools_error.pp (e :> Errors.Tools_error.any);
+            failwith "error")
     | x :: rest -> x :: inner rest
     | [] -> []
   in
