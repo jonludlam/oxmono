@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>cookbook (tomlt.cookbook)</title><meta charset="utf-8"/><link rel="stylesheet" href="../odoc.support/odoc.css"/><meta name="generator" content="odoc %%VERSION%%"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="index.html">Up</a> – <a href="../index.html">OCaml package documentation</a> &#x00BB; <a href="index.html">Tomlt</a> &#x00BB; Cookbook</nav><header class="odoc-preamble"><h1 id="cookbook"><a href="#cookbook" class="anchor"></a>Cookbook</h1><p>This cookbook provides patterns and recipes for common TOML tasks. Each section includes both conceptual explanation and working code examples. See <a href="tomlt/Tomlt/index.html"><code>Tomlt</code></a> for the full API reference.</p></header><div class="odoc-tocs"><nav class="odoc-toc odoc-local-toc"><ul><li><a href="#conventions">Conventions</a></li><li><a href="#config_files">Parsing Configuration Files</a><ul><li><a href="#basic-configuration">Basic Configuration</a></li><li><a href="#nested-configuration">Nested Configuration</a></li><li><a href="#multi-environment-configuration">Multi-Environment Configuration</a></li></ul></li><li><a href="#optional_values">Optional and Absent Values</a><ul><li><a href="#default-values-with-dec_absent">Default Values with dec_absent</a></li><li><a href="#option-types-with-opt_mem">Option Types with opt_mem</a></li><li><a href="#conditional-omission-with-enc_omit">Conditional Omission with enc_omit</a></li></ul></li><li><a href="#datetimes">Working with Datetimes</a><ul><li><a href="#toml-datetime-formats">TOML Datetime Formats</a></li><li><a href="#basic-datetime-handling">Basic Datetime Handling</a></li><li><a href="#strict-timestamp-validation">Strict Timestamp Validation</a></li><li><a href="#date-only-fields">Date-Only Fields</a></li><li><a href="#time-only-fields">Time-Only Fields</a></li><li><a href="#preserving-datetime-format">Preserving Datetime Format</a></li><li><a href="#timezone-handling">Timezone Handling</a></li></ul></li><li><a href="#arrays">Working with Arrays</a><ul><li><a href="#basic-arrays">Basic Arrays</a></li><li><a href="#arrays-of-tables">Arrays of Tables</a></li><li><a href="#nested-arrays">Nested Arrays</a></li><li><a href="#custom-array-types">Custom Array Types</a></li></ul></li><li><a href="#tables">Nested Tables and Objects</a><ul><li><a href="#inline-tables">Inline Tables</a></li><li><a href="#deeply-nested-structures">Deeply Nested Structures</a></li></ul></li><li><a href="#unknown_members">Unknown Member Handling</a><ul><li><a href="#ignoring-unknown-members-(default)">Ignoring Unknown Members (Default)</a></li><li><a href="#rejecting-unknown-members">Rejecting Unknown Members</a></li><li><a href="#collecting-unknown-members">Collecting Unknown Members</a></li><li><a href="#typed-unknown-members">Typed Unknown Members</a></li></ul></li><li><a href="#validation">Validation and Constraints</a><ul><li><a href="#range-validation-with-iter">Range Validation with iter</a></li><li><a href="#string-enumerations">String Enumerations</a></li><li><a href="#custom-transformations-with-map">Custom Transformations with map</a></li></ul></li><li><a href="#roundtripping">Roundtripping TOML</a><ul><li><a href="#preserving-raw-values">Preserving Raw Values</a></li><li><a href="#preserving-datetime-variants">Preserving Datetime Variants</a></li></ul></li><li><a href="#error_handling">Error Handling</a><ul><li><a href="#result-based-decoding">Result-Based Decoding</a></li><li><a href="#decoding-with-context">Decoding with Context</a></li><li><a href="#multiple-validation-errors">Multiple Validation Errors</a></li></ul></li><li><a href="#recursion">Recursive Types</a></li></ul></nav><nav class="odoc-toc odoc-global-toc"><ul><li><a href="../index.html">OCaml package documentation</a><ul><li><a href="../odoc/index.html">The odoc documentation generator</a></li><li><a href="../abstract_algebra/index.html">abstract_algebra index</a></li><li><a href="../accessor/index.html">accessor index</a></li><li><a href="../accessor_async/index.html">accessor_async index</a></li><li><a href="../accessor_base/index.html">accessor_base index</a></li><li><a href="../accessor_core/index.html">accessor_core index</a></li><li><a href="../afl-persistent/index.html">afl-persistent index</a></li><li><a href="../alcotest/index.html">alcotest index</a></li><li><a href="../alcotest-async/index.html">alcotest-async index</a></li><li><a href="../alcotest-js/index.html">alcotest-js index</a></li><li><a href="../alcotest-lwt/index.html">alcotest-lwt index</a></li><li><a href="../alcotest-mirage/index.html">alcotest-mirage index</a></li><li><a href="../am_running_how_js/index.html">am_running_how_js index</a></li><li><a href="../angstrom/index.html">angstrom index</a></li><li><a href="../angstrom-async/index.html">angstrom-async index</a></li><li><a href="../angstrom-lwt-unix/index.html">angstrom-lwt-unix index</a></li><li><a href="../angstrom-unix/index.html">angstrom-unix index</a></li><li><a href="../arod/index.html">arod index</a></li><li><a href="../asn1-combinators/index.html">asn1-combinators index</a></li><li><a href="../astring/index.html">Astring  <span class="version">v0.8.5</span></a></li><li><a href="../async/index.html">Async</a></li><li><a href="../async_durable/index.html">async_durable index</a></li><li><a href="../async_extra/index.html">async_extra index</a></li><li><a href="../async_find/index.html">async_find index</a></li><li><a href="../async_inotify/index.html">async_inotify index</a></li><li><a href="../async_interactive/index.html">async_interactive index</a></li><li><a href="../async_iterator/index.html">async_iterator index</a></li><li><a href="../async_js/index.html">async_js index</a></li><li><a href="../async_kernel/index.html">async_kernel index</a></li><li><a href="../async_log/index.html">async_log index</a></li><li><a href="../async_rpc_kernel/index.html">async_rpc_kernel index</a></li><li><a href="../async_sendfile/index.html">async_sendfile index</a></li><li><a href="../async_shell/index.html">async_shell index</a></li><li><a href="../async_udp/index.html">async_udp index</a></li><li><a href="../async_unix/index.html">async_unix index</a></li><li><a href="../async_websocket/index.html">async_websocket index</a></li><li><a href="../atp/index.html">atp index</a></li><li><a href="../atp-lexicon-atproto/index.html">atp-lexicon-atproto index</a></li><li><a href="../atp-lexicon-bsky/index.html">atp-lexicon-bsky index</a></li><li><a href="../atp-lexicon-standard-site/index.html">atp-lexicon-standard-site index</a></li><li><a href="../atp-lexicon-tangled/index.html">atp-lexicon-tangled index</a></li><li><a href="../atp-xrpc/index.html">atp-xrpc index</a></li><li><a href="../await/index.html">await index</a></li><li><a href="../babel/index.html">babel index</a></li><li><a href="../backoff/index.html">backoff index</a></li><li><a href="../base/index.html">Base</a></li><li><a href="../base64/index.html">base64 index</a></li><li><a href="../base_bigstring/index.html">base_bigstring index</a></li><li><a href="../base_quickcheck/index.html">Base_quickcheck</a></li><li><a href="../base_trie/index.html">base_trie index</a></li><li><a href="../basement/index.html">basement index</a></li><li><a href="../bidirectional_map/index.html">bidirectional_map index</a></li><li><a href="../big_percent/index.html">big_percent index</a></li><li><a href="../bigarray-compat/index.html">bigarray-compat index</a></li><li><a href="../bigdecimal/index.html">bigdecimal index</a></li><li><a href="../bignum/index.html">bignum index</a></li><li><a href="../bigstringaf/index.html">bigstringaf index</a></li><li><a href="../bin_prot/index.html">bin_prot index</a></li><li><a href="../bitset/index.html">bitset index</a></li><li><a href="../bonsai/index.html">bonsai index</a></li><li><a href="../bonsai_bench/index.html">bonsai_bench index</a></li><li><a href="../bonsai_concrete/index.html">bonsai_concrete index</a></li><li><a href="../bonsai_examples/index.html">bonsai_examples index</a></li><li><a href="../bonsai_term/index.html">bonsai_term index</a></li><li><a href="../bonsai_term_components/index.html">bonsai_term_components index</a></li><li><a href="../bonsai_term_test/index.html">bonsai_term_test index</a></li><li><a href="../bonsai_test/index.html">bonsai_test index</a></li><li><a href="../bonsai_web/index.html">bonsai_web index</a></li><li><a href="../bonsai_web_components/index.html">bonsai_web_components index</a></li><li><a href="../bonsai_web_test/index.html">bonsai_web_test index</a></li><li><a href="../bos/index.html">Bos  <span class="version">v0.2.1</span></a></li><li><a href="../brotli/index.html">brotli index</a></li><li><a href="../brr/index.html">Brr  <span class="version">v0.0.7</span></a></li><li><a href="../bsky/index.html">bsky index</a></li><li><a href="../bushel/index.html">bushel index</a></li><li><a href="../bytes/index.html">bytes index</a></li><li><a href="../bytesrw/index.html">Bytesrw  <span class="version">v0.3.0</span></a></li><li><a href="../bytesrw-eio/index.html">bytesrw-eio index</a></li><li><a href="../ca-certs/index.html">ca-certs index</a></li><li><a href="../camlp-streams/index.html">camlp-streams index</a></li><li><a href="../capitalization/index.html">capitalization index</a></li><li><a href="../capsule/index.html">capsule index</a></li><li><a href="../capsule0/index.html">capsule0 index</a></li><li><a href="../cbort/index.html">cbort index</a></li><li><a href="../checkseum/index.html">checkseum index</a></li><li><a href="../chrome-trace/index.html">chrome-trace index</a></li><li><a href="../claude/index.html">claude index</a></li><li><a href="../cmarkit/index.html">Cmarkit  <span class="version">v0.3.0</span></a></li><li><a href="../cmdliner/index.html">cmdliner index</a></li><li><a href="../codicons/index.html">codicons index</a></li><li><a href="../cohttp/index.html">cohttp index</a></li><li><a href="../cohttp-async/index.html">cohttp-async index</a></li><li><a href="../cohttp-bench/index.html">cohttp-bench index</a></li><li><a href="../cohttp-curl/index.html">cohttp-curl index</a></li><li><a href="../cohttp-curl-async/index.html">cohttp-curl-async index</a></li><li><a href="../cohttp-curl-lwt/index.html">cohttp-curl-lwt index</a></li><li><a href="../cohttp-eio/index.html">cohttp-eio index</a></li><li><a href="../cohttp-lwt/index.html">cohttp-lwt index</a></li><li><a href="../cohttp-lwt-jsoo/index.html">cohttp-lwt-jsoo index</a></li><li><a href="../cohttp-lwt-unix/index.html">cohttp-lwt-unix index</a></li><li><a href="../cohttp-mirage/index.html">cohttp-mirage index</a></li><li><a href="../cohttp-server-lwt-unix/index.html">cohttp-server-lwt-unix index</a></li><li><a href="../cohttp-top/index.html">cohttp-top index</a></li><li><a href="../cohttp_static_handler/index.html">cohttp_static_handler index</a></li><li><a href="../command_nodejs/index.html">command_nodejs index</a></li><li><a href="../command_rpc/index.html">command_rpc index</a></li><li><a href="../concurrent/index.html">concurrent index</a></li><li><a href="../conduit/index.html">conduit</a></li><li><a href="../conduit-async/index.html">conduit-async index</a></li><li><a href="../conduit-lwt/index.html">conduit-lwt index</a></li><li><a href="../conduit-lwt-unix/index.html">conduit-lwt-unix index</a></li><li><a href="../conduit-mirage/index.html">conduit-mirage index</a></li><li><a href="../conpool/index.html">conpool index</a></li><li><a href="../content_security_policy/index.html">content_security_policy index</a></li><li><a href="../cookeio/index.html">cookeio index</a></li><li><a href="../coq-menhirlib/index.html">coq-menhirlib index</a></li><li><a href="../core/index.html">Core</a></li><li><a href="../core_bench/index.html">core_bench index</a></li><li><a href="../core_extended/index.html">core_extended index</a></li><li><a href="../core_kernel/index.html">core_kernel index</a></li><li><a href="../core_profiler/index.html">Core_profiler</a></li><li><a href="../core_unix/index.html">core_unix index</a></li><li><a href="../cppo/index.html">cppo index</a></li><li><a href="../cppo_ocamlbuild/index.html">cppo_ocamlbuild index</a></li><li><a href="../crowbar/index.html">crowbar index</a></li><li><a href="../crunch/index.html">crunch index</a></li><li><a href="../cryptokit/index.html">cryptokit index</a></li><li><a href="../csexp/index.html">csexp index</a></li><li><a href="../cstruct/index.html">cstruct index</a></li><li><a href="../cstruct-async/index.html">cstruct-async index</a></li><li><a href="../cstruct-lwt/index.html">cstruct-lwt index</a></li><li><a href="../cstruct-sexp/index.html">cstruct-sexp index</a></li><li><a href="../cstruct-unix/index.html">cstruct-unix index</a></li><li><a href="../csvfields/index.html">csvfields index</a></li><li><a href="../curl/index.html">curl index</a></li><li><a href="../curl_async/index.html">curl_async index</a></li><li><a href="../curl_lwt/index.html">curl_lwt index</a></li><li><a href="../current_exe/index.html">current_exe index</a></li><li><a href="../decompress/index.html">decompress index</a></li><li><a href="../dedent/index.html">dedent index</a></li><li><a href="../delimited_parsing/index.html">delimited_parsing index</a></li><li><a href="../digestif/index.html">digestif index</a></li><li><a href="../domain-local-await/index.html">domain-local-await index</a></li><li><a href="../domain-name/index.html">domain-name index</a></li><li><a href="../dot-merlin-reader/index.html">dot-merlin-reader index</a></li><li><a href="../dune/index.html">dune</a></li><li><a href="../dune-action-plugin/index.html">dune-action-plugin index</a></li><li><a href="../dune-build-info/index.html">dune-build-info</a></li><li><a href="../dune-compiledb/index.html">dune-compiledb index</a></li><li><a href="../dune-configurator/index.html">dune-configurator</a></li><li><a href="../dune-glob/index.html">dune-glob</a></li><li><a href="../dune-private-libs/index.html">dune-private-libs index</a></li><li><a href="../dune-rpc/index.html">dune-rpc index</a></li><li><a href="../dune-rpc-lwt/index.html">dune-rpc-lwt index</a></li><li><a href="../dune-site/index.html">dune-site index</a></li><li><a href="../dyn/index.html">dyn index</a></li><li><a href="../ecaml/index.html">ecaml index</a></li><li><a href="../eio/index.html">eio index</a></li><li><a href="../eio_linux/index.html">eio_linux index</a></li><li><a href="../eio_main/index.html">eio_main index</a></li><li><a href="../eio_posix/index.html">eio_posix index</a></li><li><a href="../eio_windows/index.html">eio_windows index</a></li><li><a href="../either/index.html">either index</a></li><li><a href="../email_message/index.html">email_message index</a></li><li><a href="../env_config/index.html">env_config index</a></li><li><a href="../eqaf/index.html">eqaf index</a></li><li><a href="../eqaf-cstruct/index.html">eqaf-cstruct index</a></li><li><a href="../expect_test_helpers_async/index.html">expect_test_helpers_async index</a></li><li><a href="../expect_test_helpers_core/index.html">expect_test_helpers_core index</a></li><li><a href="../expectable/index.html">expectable index</a></li><li><a href="../expectree/index.html">expectree index</a></li><li><a href="../ezjsonm/index.html">ezjsonm index</a></li><li><a href="../ezjsonm-lwt/index.html">ezjsonm-lwt index</a></li><li><a href="../faraday/index.html">faraday index</a></li><li><a href="../faraday-async/index.html">faraday-async index</a></li><li><a href="../faraday-lwt/index.html">faraday-lwt index</a></li><li><a href="../faraday-lwt-unix/index.html">faraday-lwt-unix index</a></li><li><a href="../fiber/index.html">fiber index</a></li><li><a href="../fiber-lwt/index.html">fiber-lwt index</a></li><li><a href="../fieldslib/index.html">fieldslib index</a></li><li><a href="../file_path/index.html">file_path index</a></li><li><a href="../filesystem/index.html">filesystem index</a></li><li><a href="../findlib/index.html">findlib index</a></li><li><a href="../finger/index.html">finger index</a></li><li><a href="../fix/index.html">Fix: Memoization and Fixed Points Made Easy</a></li><li><a href="../flexible_sexp/index.html">flexible_sexp index</a></li><li><a href="../float_array/index.html">float_array index</a></li><li><a href="../fmt/index.html">Fmt  <span class="version">v0.10.0</span></a></li><li><a href="../font_awesome_icons/index.html">font_awesome_icons index</a></li><li><a href="../fpath/index.html">Fpath  <span class="version">v0.7.3</span></a></li><li><a href="../frontmatter/index.html">frontmatter index</a></li><li><a href="../frontmatter-eio/index.html">frontmatter-eio index</a></li><li><a href="../fs-io/index.html">fs-io index</a></li><li><a href="../fuzzy_match/index.html">fuzzy_match index</a></li><li><a href="../fzf/index.html">fzf index</a></li><li><a href="../gen/index.html">gen index</a></li><li><a href="../gen_js_api/index.html">gen_js_api index</a></li><li><a href="../gitops/index.html">gitops index</a></li><li><a href="../gmap/index.html">gmap index</a></li><li><a href="../handled_effect/index.html">handled_effect index</a></li><li><a href="../hardcaml/index.html">hardcaml index</a></li><li><a href="../hardcaml_axi/index.html">hardcaml_axi index</a></li><li><a href="../hardcaml_circuits/index.html">hardcaml_circuits index</a></li><li><a href="../hardcaml_event_driven_sim/index.html">hardcaml_event_driven_sim index</a></li><li><a href="../hardcaml_fixed_point/index.html">hardcaml_fixed_point index</a></li><li><a href="../hardcaml_handshake/index.html">hardcaml_handshake index</a></li><li><a href="../hardcaml_hobby_boards_demos/index.html">hardcaml_hobby_boards_demos index</a></li><li><a href="../hardcaml_hobby_boards_kernel/index.html">hardcaml_hobby_boards_kernel index</a></li><li><a href="../hardcaml_of_verilog/index.html">hardcaml_of_verilog index</a></li><li><a href="../hardcaml_step_testbench/index.html">hardcaml_step_testbench index</a></li><li><a href="../hardcaml_template_project/index.html">hardcaml_template_project index</a></li><li><a href="../hardcaml_test_harness/index.html">hardcaml_test_harness index</a></li><li><a href="../hardcaml_verify/index.html">hardcaml_verify index</a></li><li><a href="../hardcaml_waveterm/index.html">hardcaml_waveterm index</a></li><li><a href="../hardcaml_xilinx/index.html">hardcaml_xilinx index</a></li><li><a href="../hardcaml_xilinx_components/index.html">hardcaml_xilinx_components index</a></li><li><a href="../hardcaml_xilinx_reports/index.html">hardcaml_xilinx_reports index</a></li><li><a href="../hermest/index.html">hermest index</a></li><li><a href="../hermest-cli/index.html">hermest-cli index</a></li><li><a href="../heterogeneous_list/index.html">heterogeneous_list index</a></li><li><a href="../hex/index.html">hex index</a></li><li><a href="../hex_encode/index.html">hex_encode index</a></li><li><a href="../hg_lib/index.html">hg_lib index</a></li><li><a href="../higher_kinded/index.html">higher_kinded index</a></li><li><a href="../hmap/index.html">hmap index</a></li><li><a href="../htmlit/index.html">htmlit index</a></li><li><a href="../http/index.html">http index</a></li><li><a href="../httpaf/index.html">httpaf index</a></li><li><a href="../httpaf-async/index.html">httpaf-async index</a></li><li><a href="../httpaf-lwt-unix/index.html">httpaf-lwt-unix index</a></li><li><a href="../httpz/index.html">httpz index</a></li><li><a href="../httpz-perma-proxy/index.html">httpz-perma-proxy index</a></li><li><a href="../immich/index.html">immich index</a></li><li><a href="../incr_dom/index.html">incr_dom index</a></li><li><a href="../incr_dom_interactive/index.html">incr_dom_interactive index</a></li><li><a href="../incr_dom_partial_render/index.html">incr_dom_partial_render index</a></li><li><a href="../incr_dom_sexp_form/index.html">incr_dom_sexp_form index</a></li><li><a href="../incr_map/index.html">incr_map index</a></li><li><a href="../incr_select/index.html">incr_select index</a></li><li><a href="../incremental/index.html">incremental index</a></li><li><a href="../indentation_buffer/index.html">indentation_buffer index</a></li><li><a href="../inotify/index.html">inotify index</a></li><li><a href="../inotify-eio/index.html">inotify-eio index</a></li><li><a href="../insertion_ordered_map/index.html">insertion_ordered_map index</a></li><li><a href="../int_repr/index.html">int_repr index</a></li><li><a href="../integers/index.html">integers index</a></li><li><a href="../iomux/index.html">iomux index</a></li><li><a href="../ipaddr/index.html">ipaddr index</a></li><li><a href="../ipaddr-cstruct/index.html">ipaddr-cstruct index</a></li><li><a href="../ipaddr-sexp/index.html">ipaddr-sexp index</a></li><li><a href="../jane-street-headers/index.html">jane-street-headers index</a></li><li><a href="../jane_rope/index.html">jane_rope index</a></li><li><a href="../janestreet_cpuid/index.html">janestreet_cpuid index</a></li><li><a href="../janestreet_csv/index.html">janestreet_csv index</a></li><li><a href="../janestreet_lru_cache/index.html">janestreet_lru_cache index</a></li><li><a href="../janestreet_shims/index.html">janestreet_shims index</a></li><li><a href="../jingoo/index.html">jingoo index</a></li><li><a href="../js_of_ocaml/index.html">js_of_ocaml index</a></li><li><a href="../js_of_ocaml-compiler/index.html">js_of_ocaml-compiler index</a></li><li><a href="../js_of_ocaml-lwt/index.html">js_of_ocaml-lwt index</a></li><li><a href="../js_of_ocaml-ppx/index.html">js_of_ocaml-ppx index</a></li><li><a href="../js_of_ocaml-ppx_deriving_json/index.html">js_of_ocaml-ppx_deriving_json index</a></li><li><a href="../js_of_ocaml-toplevel/index.html">js_of_ocaml-toplevel index</a></li><li><a href="../js_of_ocaml-tyxml/index.html">js_of_ocaml-tyxml index</a></li><li><a href="../js_of_ocaml_patches/index.html">js_of_ocaml_patches index</a></li><li><a href="../jsonaf/index.html">jsonaf index</a></li><li><a href="../jsonfeed/index.html">jsonfeed index</a></li><li><a href="../jsonm/index.html">Jsonm  <span class="version">v1.0.2</span></a></li><li><a href="../jsonrpc/index.html">jsonrpc index</a></li><li><a href="../jsont/index.html">Jsont  <span class="version">v0.2.0</span></a></li><li><a href="../jsonwt/index.html">jsonwt index</a></li><li><a href="../jst-config/index.html">jst-config index</a></li><li><a href="../karakeep/index.html">karakeep index</a></li><li><a href="../kdf/index.html">kdf index</a></li><li><a href="../lambdasoup/index.html">lambdasoup index</a></li><li><a href="../legacy_diffable/index.html">legacy_diffable index</a></li><li><a href="../line-up-words/index.html">line-up-words index</a></li><li><a href="../logs/index.html">Logs  <span class="version">v0.9.0</span></a></li><li><a href="../lsp/index.html">lsp index</a></li><li><a href="../lsp_rpc/index.html">lsp_rpc index</a></li><li><a href="../lwt/index.html">Lwt</a></li><li><a href="../lwt-dllist/index.html">lwt-dllist index</a></li><li><a href="../lwt_direct/index.html">lwt_direct index</a></li><li><a href="../lwt_ppx/index.html">lwt_ppx index</a></li><li><a href="../lwt_ppx__ppx_let_tests/index.html">lwt_ppx__ppx_let_tests index</a></li><li><a href="../lwt_react/index.html">lwt_react index</a></li><li><a href="../lwt_retry/index.html">lwt_retry index</a></li><li><a href="../lwt_runtime_events/index.html">lwt_runtime_events index</a></li><li><a href="../macaddr/index.html">macaddr index</a></li><li><a href="../macaddr-cstruct/index.html">macaddr-cstruct index</a></li><li><a href="../macaddr-sexp/index.html">macaddr-sexp index</a></li><li><a href="../magic-mime/index.html">magic-mime index</a></li><li><a href="../man_in_the_middle_debugger/index.html">man_in_the_middle_debugger index</a></li><li><a href="../markup/index.html">markup index</a></li><li><a href="../markup-lwt/index.html">markup-lwt index</a></li><li><a href="../maybe_pushback/index.html">maybe_pushback index</a></li><li><a href="../mdx/index.html">mdx index</a></li><li><a href="../memtrace/index.html">memtrace index</a></li><li><a href="../memtrace_viewer/index.html">memtrace_viewer index</a></li><li><a href="../menhir/index.html">menhir index</a></li><li><a href="../menhirCST/index.html">menhirCST index</a></li><li><a href="../menhirLib/index.html">menhirLib index</a></li><li><a href="../menhirSdk/index.html">menhirSdk index</a></li><li><a href="../merlin/index.html">merlin index</a></li><li><a href="../merlin-lib/index.html">merlin-lib index</a></li><li><a href="../mew/index.html">mew index</a></li><li><a href="../mew_vi/index.html">mew_vi index</a></li><li><a href="../mirage-crypto/index.html">mirage-crypto index</a></li><li><a href="../mirage-crypto-ec/index.html">mirage-crypto-ec index</a></li><li><a href="../mirage-crypto-pk/index.html">mirage-crypto-pk index</a></li><li><a href="../mirage-crypto-rng/index.html">mirage-crypto-rng index</a></li><li><a href="../mirage-crypto-rng-miou-unix/index.html">mirage-crypto-rng-miou-unix index</a></li><li><a href="../mirage-crypto-rng-mirage/index.html">mirage-crypto-rng-mirage index</a></li><li><a href="../mlt_parser/index.html">mlt_parser index</a></li><li><a href="../mtime/index.html">Mtime  <span class="version">v2.1.0</span></a></li><li><a href="../multibase/index.html">multibase index</a></li><li><a href="../n_ary/index.html">n_ary index</a></li><li><a href="../netsnmp/index.html">netsnmp index</a></li><li><a href="../nonempty_interval_lib/index.html">nonempty_interval_lib index</a></li><li><a href="../notty-community/index.html">notty-community index</a></li><li><a href="../notty_async/index.html">notty_async index</a></li><li><a href="../num/index.html">num index</a></li><li><a href="../numeric_string/index.html">numeric_string index</a></li><li><a href="../ocaml-compiler-libs/index.html">ocaml-compiler-libs index</a></li><li><a href="../ocaml-embed-file/index.html">ocaml-embed-file index</a></li><li><a href="../ocaml-index/index.html">ocaml-index index</a></li><li><a href="../ocaml-lsp-server/index.html">ocaml-lsp-server index</a></li><li><a href="../ocaml-probes/index.html">ocaml-probes index</a></li><li><a href="../ocaml-syntax-shims/index.html">ocaml-syntax-shims index</a></li><li><a href="../ocaml-version/index.html">ocaml-version index</a></li><li><a href="../ocaml_intrinsics/index.html">ocaml_intrinsics index</a></li><li><a href="../ocaml_intrinsics_kernel/index.html">ocaml_intrinsics_kernel index</a></li><li><a href="../ocaml_openapi_generator/index.html">ocaml_openapi_generator index</a></li><li><a href="../ocaml_simd/index.html">ocaml_simd index</a></li><li><a href="../ocamlc-loc/index.html">ocamlc-loc index</a></li><li><a href="../ocamlfind/index.html">ocamlfind index</a></li><li><a href="../ocamlgraph/index.html">ocamlgraph index</a></li><li><a href="../ocamlgraph_gtk/index.html">ocamlgraph_gtk index</a></li><li><a href="../ocp-indent/index.html">ocp-indent index</a></li><li><a href="../ocplib-endian/index.html">ocplib-endian index</a></li><li><a href="../ocurl/index.html">ocurl index</a></li><li><a href="../odoc-bench/index.html">odoc-bench index</a></li><li><a href="../odoc-driver/index.html">The odoc reference driver</a></li><li><a href="../odoc-md/index.html">odoc-md index</a></li><li><a href="../odoc-parser/index.html">odoc-parser index</a></li><li><a href="../of_json/index.html">of_json index</a></li><li><a href="../ohex/index.html">ohex index</a></li><li><a href="../ojs/index.html">ojs index</a></li><li><a href="../oklab/index.html">oklab index</a></li><li><a href="../opam-file-format/index.html">opam-file-format index</a></li><li><a href="../opatch/index.html">opatch index</a></li><li><a href="../openapi/index.html">OCaml OpenAPI</a></li><li><a href="../optint/index.html">optint index</a></li><li><a href="../ordering/index.html">ordering index</a></li><li><a href="../ordinal_abbreviation/index.html">ordinal_abbreviation index</a></li><li><a href="../owee/index.html">owee index</a></li><li><a href="../oxcaml_intrinsics/index.html">oxcaml_intrinsics index</a></li><li><a href="../oxmono/index.html">oxmono index</a></li><li><a href="../pam/index.html">pam index</a></li><li><a href="../parallel/index.html">parallel index</a></li><li><a href="../parsexp/index.html">parsexp index</a></li><li><a href="../parsexp_io/index.html">parsexp_io index</a></li><li><a href="../parsexp_prefix/index.html">parsexp_prefix index</a></li><li><a href="../parsexp_symbolic_automaton/index.html">parsexp_symbolic_automaton index</a></li><li><a href="../patch/index.html">patch index</a></li><li><a href="../patdiff/index.html">patdiff index</a></li><li><a href="../patience_diff/index.html">patience_diff index</a></li><li><a href="../pcre/index.html">pcre index</a></li><li><a href="../peertube/index.html">peertube index</a></li><li><a href="../pending_or_error/index.html">pending_or_error index</a></li><li><a href="../pipe_with_writer_error/index.html">pipe_with_writer_error index</a></li><li><a href="../polling_state_rpc/index.html">polling_state_rpc index</a></li><li><a href="../portable/index.html">portable index</a></li><li><a href="../portable_lockfree_htbl/index.html">portable_lockfree_htbl index</a></li><li><a href="../portable_ws_deque/index.html">portable_ws_deque index</a></li><li><a href="../posixat/index.html">posixat index</a></li><li><a href="../pp/index.html">pp index</a></li><li><a href="../ppx_accessor/index.html">ppx_accessor index</a></li><li><a href="../ppx_anonymous_record/index.html">ppx_anonymous_record index</a></li><li><a href="../ppx_array/index.html">ppx_array index</a></li><li><a href="../ppx_array_base/index.html">ppx_array_base index</a></li><li><a href="../ppx_assert/index.html">ppx_assert index</a></li><li><a href="../ppx_base/index.html">ppx_base index</a></li><li><a href="../ppx_bench/index.html">ppx_bench index</a></li><li><a href="../ppx_bin_prot/index.html">ppx_bin_prot index</a></li><li><a href="../ppx_blob/index.html">ppx_blob index</a></li><li><a href="../ppx_box/index.html">ppx_box index</a></li><li><a href="../ppx_cold/index.html">ppx_cold index</a></li><li><a href="../ppx_compare/index.html">ppx_compare index</a></li><li><a href="../ppx_conv_func/index.html">ppx_conv_func index</a></li><li><a href="../ppx_css/index.html">ppx_css index</a></li><li><a href="../ppx_cstruct/index.html">ppx_cstruct index</a></li><li><a href="../ppx_csv_conv/index.html">ppx_csv_conv index</a></li><li><a href="../ppx_custom_printf/index.html">ppx_custom_printf index</a></li><li><a href="../ppx_debug_assert/index.html">ppx_debug_assert index</a></li><li><a href="../ppx_derive_at_runtime/index.html">ppx_derive_at_runtime index</a></li><li><a href="../ppx_derivers/index.html">ppx_derivers index</a></li><li><a href="../ppx_deriving/index.html">ppx_deriving index</a></li><li><a href="../ppx_diff/index.html">ppx_diff index</a></li><li><a href="../ppx_disable_unused_warnings/index.html">ppx_disable_unused_warnings index</a></li><li><a href="../ppx_embed_file/index.html">ppx_embed_file index</a></li><li><a href="../ppx_enumerate/index.html">ppx_enumerate index</a></li><li><a href="../ppx_expect/index.html">ppx_expect index</a></li><li><a href="../ppx_fields_conv/index.html">ppx_fields_conv index</a></li><li><a href="../ppx_fixed_literal/index.html">ppx_fixed_literal index</a></li><li><a href="../ppx_for_loop/index.html">ppx_for_loop index</a></li><li><a href="../ppx_fuelproof/index.html">ppx_fuelproof index</a></li><li><a href="../ppx_globalize/index.html">ppx_globalize index</a></li><li><a href="../ppx_hardcaml/index.html">ppx_hardcaml index</a></li><li><a href="../ppx_hash/index.html">ppx_hash index</a></li><li><a href="../ppx_helpers/index.html">ppx_helpers index</a></li><li><a href="../ppx_here/index.html">ppx_here index</a></li><li><a href="../ppx_html/index.html">ppx_html index</a></li><li><a href="../ppx_ignore_instrumentation/index.html">ppx_ignore_instrumentation index</a></li><li><a href="../ppx_inline_test/index.html">ppx_inline_test index</a></li><li><a href="../ppx_int63_literal/index.html">ppx_int63_literal index</a></li><li><a href="../ppx_jane/index.html">ppx_jane index</a></li><li><a href="../ppx_js_style/index.html">ppx_js_style index</a></li><li><a href="../ppx_jsonaf_conv/index.html">ppx_jsonaf_conv index</a></li><li><a href="../ppx_let/index.html">ppx_let index</a></li><li><a href="../ppx_log/index.html">ppx_log index</a></li><li><a href="../ppx_module_timer/index.html">ppx_module_timer index</a></li><li><a href="../ppx_optcomp/index.html">ppx_optcomp index</a></li><li><a href="../ppx_optional/index.html">ppx_optional index</a></li><li><a href="../ppx_pattern_bind/index.html">ppx_pattern_bind index</a></li><li><a href="../ppx_pipebang/index.html">ppx_pipebang index</a></li><li><a href="../ppx_portable/index.html">ppx_portable index</a></li><li><a href="../ppx_quick_test/index.html">ppx_quick_test index</a></li><li><a href="../ppx_rope/index.html">ppx_rope index</a></li><li><a href="../ppx_sexp_conv/index.html">ppx_sexp_conv index</a></li><li><a href="../ppx_sexp_message/index.html">ppx_sexp_message index</a></li><li><a href="../ppx_sexp_value/index.html">ppx_sexp_value index</a></li><li><a href="../ppx_shorthand/index.html">ppx_shorthand index</a></li><li><a href="../ppx_simple_xml_conv/index.html">ppx_simple_xml_conv index</a></li><li><a href="../ppx_stable/index.html">ppx_stable index</a></li><li><a href="../ppx_stable_witness/index.html">ppx_stable_witness index</a></li><li><a href="../ppx_string/index.html">ppx_string index</a></li><li><a href="../ppx_string_conv/index.html">ppx_string_conv index</a></li><li><a href="../ppx_template/index.html">ppx_template index</a></li><li><a href="../ppx_tydi/index.html">ppx_tydi index</a></li><li><a href="../ppx_typed_fields/index.html">ppx_typed_fields index</a></li><li><a href="../ppx_typerep_conv/index.html">ppx_typerep_conv index</a></li><li><a href="../ppx_var_name/index.html">ppx_var_name index</a></li><li><a href="../ppx_variants_conv/index.html">ppx_variants_conv index</a></li><li><a href="../ppx_with/index.html">ppx_with index</a></li><li><a href="../ppx_xml_conv/index.html">ppx_xml_conv index</a></li><li><a href="../ppx_yojson_conv/index.html">ppx_yojson_conv index</a></li><li><a href="../ppx_yojson_conv_lib/index.html">ppx_yojson_conv_lib index</a></li><li><a href="../ppxlib/index.html"><code>ppxlib</code>'s user manual</a></li><li><a href="../ppxlib-bench/index.html">ppxlib-bench index</a></li><li><a href="../ppxlib_ast/index.html">ppxlib_ast index</a></li><li><a href="../ppxlib_jane/index.html">ppxlib_jane index</a></li><li><a href="../profunctor/index.html">profunctor index</a></li><li><a href="../progress/index.html">progress index</a></li><li><a href="../protocol_version_header/index.html">protocol_version_header index</a></li><li><a href="../psq/index.html">psq index</a></li><li><a href="../ptime/index.html">Ptime  <span class="version">v1.2.0</span></a></li><li><a href="../publicsuffix/index.html">publicsuffix index</a></li><li><a href="../punycode/index.html">punycode index</a></li><li><a href="../re/index.html">re index</a></li><li><a href="../re2/index.html">re2 index</a></li><li><a href="../re_parser/index.html">re_parser index</a></li><li><a href="../react/index.html">React  <span class="version">v1.2.2</span></a></li><li><a href="../record_builder/index.html">record_builder index</a></li><li><a href="../redis-async/index.html">redis-async index</a></li><li><a href="../regex_parser_intf/index.html">regex_parser_intf index</a></li><li><a href="../requests/index.html">requests index</a></li><li><a href="../resource_cache/index.html">resource_cache index</a></li><li><a href="../result/index.html">result index</a></li><li><a href="../rfc1951/index.html">rfc1951 index</a></li><li><a href="../root/index.html">root index</a></li><li><a href="../rpc_parallel/index.html">rpc_parallel index</a></li><li><a href="../rresult/index.html">Rresult  <span class="version">v0.7.0</span></a></li><li><a href="../sedlex/index.html">sedlex index</a></li><li><a href="../semantic_version/index.html">semantic_version index</a></li><li><a href="../seq/index.html">seq index</a></li><li><a href="../sequencer_table/index.html">sequencer_table index</a></li><li><a href="../sexp/index.html">sexp index</a></li><li><a href="../sexp_diff/index.html">sexp_diff index</a></li><li><a href="../sexp_grammar/index.html">sexp_grammar index</a></li><li><a href="../sexp_macro/index.html">sexp_macro index</a></li><li><a href="../sexp_pretty/index.html">sexp_pretty index</a></li><li><a href="../sexp_select/index.html">sexp_select index</a></li><li><a href="../sexp_string_quickcheck/index.html">sexp_string_quickcheck index</a></li><li><a href="../sexp_type/index.html">sexp_type index</a></li><li><a href="../sexplib/index.html">sexplib index</a></li><li><a href="../sexplib0/index.html">sexplib0 index</a></li><li><a href="../sha/index.html">sha index</a></li><li><a href="../shell/index.html">shell index</a></li><li><a href="../sherlodoc/index.html">sherlodoc index</a></li><li><a href="../shexp/index.html">shexp index</a></li><li><a href="../simple_xml/index.html">simple_xml index</a></li><li><a href="../sitemap/index.html">sitemap index</a></li><li><a href="../snappy/index.html">snappy index</a></li><li><a href="../sortal/index.html">sortal index</a></li><li><a href="../spawn/index.html">spawn index</a></li><li><a href="../splay_tree/index.html">splay_tree index</a></li><li><a href="../splittable_random/index.html">splittable_random index</a></li><li><a href="../sqlite3/index.html">sqlite3 index</a></li><li><a href="../sqlite3-eio/index.html">sqlite3-eio index</a></li><li><a href="../srcsetter/index.html">srcsetter index</a></li><li><a href="../srcsetter-cmd/index.html">srcsetter-cmd index</a></li><li><a href="../standard-site/index.html">standard-site index</a></li><li><a href="../stdio/index.html">Stdio: Standard IO Library for OCaml</a></li><li><a href="../stdlib-shims/index.html">stdlib-shims index</a></li><li><a href="../stdune/index.html">stdune index</a></li><li><a href="../stored_reversed/index.html">stored_reversed index</a></li><li><a href="../streamable/index.html">streamable index</a></li><li><a href="../string_dict/index.html">string_dict index</a></li><li><a href="../stringext/index.html">stringext index</a></li><li><a href="../swhid_core/index.html">swhid_core</a></li><li><a href="../syndic/index.html">syndic index</a></li><li><a href="../tangled/index.html">tangled index</a></li><li><a href="../terminal/index.html">terminal index</a></li><li><a href="../testable_timeout/index.html">testable_timeout index</a></li><li><a href="../textutils/index.html">textutils index</a></li><li><a href="../textutils_kernel/index.html">textutils_kernel index</a></li><li><a href="../thread-table/index.html">thread-table index</a></li><li><a href="../tilde_f/index.html">tilde_f index</a></li><li><a href="../time_ago/index.html">time_ago index</a></li><li><a href="../time_now/index.html">time_now index</a></li><li><a href="../timezone/index.html">timezone index</a></li><li><a href="../tls/index.html">tls index</a></li><li><a href="../tls-async/index.html">tls-async index</a></li><li><a href="../tls-eio/index.html">tls-eio index</a></li><li><a href="../tls-lwt/index.html">tls-lwt index</a></li><li><a href="../tls-miou-unix/index.html">tls-miou-unix index</a></li><li><a href="../tls-mirage/index.html">tls-mirage index</a></li><li><a href="index.html">Tomlt</a><ul><li><a href="#" class="current_unit">Cookbook</a></li><li>Library <code>tomlt</code><ul><li><a href="tomlt/Tomlt/index.html">Tomlt</a></li></ul></li><li>Library <code>tomlt.bytesrw</code><ul><li><a href="tomlt.bytesrw/Tomlt_bytesrw/index.html">Tomlt_bytesrw</a></li></ul></li><li>Library <code>tomlt.eio</code><ul><li><a href="tomlt.eio/Tomlt_eio/index.html">Tomlt_eio</a></li></ul></li><li>Library <code>tomlt.jsont</code><ul><li><a href="tomlt.jsont/Tomlt_jsont/index.html">Tomlt_jsont</a></li></ul></li><li>Library <code>tomlt.unix</code><ul><li><a href="tomlt.unix/Tomlt_unix/index.html">Tomlt_unix</a></li></ul></li></ul></li><li><a href="../top-closure/index.html">top-closure index</a></li><li><a href="../toplayer/index.html">toplayer index</a></li><li><a href="../toplevel_backend/index.html">toplevel_backend index</a></li><li><a href="../toplevel_expect_test/index.html">toplevel_expect_test index</a></li><li><a href="../topological_sort/index.html">topological_sort index</a></li><li><a href="../tracing/index.html">tracing index</a></li><li><a href="../trie/index.html">trie index</a></li><li><a href="../tw/index.html">tw index</a></li><li><a href="../typerep/index.html">typerep index</a></li><li><a href="../typesense/index.html">typesense index</a></li><li><a href="../tyxml/index.html">tyxml index</a></li><li><a href="../tyxml-jsx/index.html">tyxml-jsx index</a></li><li><a href="../tyxml-ppx/index.html">tyxml-ppx index</a></li><li><a href="../tyxml-syntax/index.html">tyxml-syntax index</a></li><li><a href="../unboxed/index.html">unboxed index</a></li><li><a href="../unboxed_datatypes/index.html">unboxed_datatypes index</a></li><li><a href="../unique/index.html">unique index</a></li><li><a href="../univ_map/index.html">univ_map index</a></li><li><a href="../unsafe_clear/index.html">unsafe_clear index</a></li><li><a href="../uopt/index.html">uopt index</a></li><li><a href="../uri/index.html">uri index</a></li><li><a href="../uri-bench/index.html">uri-bench index</a></li><li><a href="../uri-re/index.html">uri-re index</a></li><li><a href="../uri-sexp/index.html">uri-sexp index</a></li><li><a href="../uri_parsing/index.html">uri_parsing index</a></li><li><a href="../uring/index.html">uring index</a></li><li><a href="../username_kernel/index.html">username_kernel index</a></li><li><a href="../uucp/index.html">Uucp  <span class="version">v16.0.0</span></a></li><li><a href="../uunf/index.html">uunf index</a></li><li><a href="../uuseg/index.html">Uuseg  <span class="version">v16.0.0</span></a></li><li><a href="../uutf/index.html">Uutf  <span class="version">v1.0.3</span></a></li><li><a href="../variantslib/index.html">variantslib index</a></li><li><a href="../vcaml/index.html">vcaml index</a></li><li><a href="../vec/index.html">vec index</a></li><li><a href="../vendored_fix/index.html">vendored_fix index</a></li><li><a href="../vendored_pprint/index.html">vendored_pprint index</a></li><li><a href="../versioned_polling_state_rpc/index.html">versioned_polling_state_rpc index</a></li><li><a href="../virtual_dom/index.html">virtual_dom index</a></li><li><a href="../wasm_of_ocaml-compiler/index.html">wasm_of_ocaml-compiler index</a></li><li><a href="../webfinger/index.html">webfinger index</a></li><li><a href="../x509/index.html">x509 index</a></li><li><a href="../xdg/index.html">xdg</a></li><li><a href="../xdge/index.html">xdge index</a></li><li><a href="../xmlm/index.html">Xmlm  <span class="version">v1.4.0</span></a></li><li><a href="../xpath/index.html">xpath index</a></li><li><a href="../xrpc-auth/index.html">xrpc-auth index</a></li><li><a href="../yamlrw/index.html">Yamlrw</a></li><li><a href="../yamlrw-eio/index.html">yamlrw-eio index</a></li><li><a href="../yamlrw-unix/index.html">yamlrw-unix index</a></li><li><a href="../yamlt/index.html">yamlt index</a></li><li><a href="../yojson/index.html">The <code>yojson</code> library</a></li><li><a href="../yojson-bench/index.html">yojson-bench index</a></li><li><a href="../yojson-five/index.html">yojson-five index</a></li><li><a href="../zarith/index.html">zarith index</a></li><li><a href="../zarith_stubs_js/index.html">zarith_stubs_js index</a></li><li><a href="../zotero-translation/index.html">zotero-translation index</a></li></ul></li></ul></nav></div><div class="odoc-content"><h2 id="conventions"><a href="#conventions" class="anchor"></a>Conventions</h2><p>Throughout this cookbook, we use the following conventions:</p><ul><li>Codec values are named after their OCaml type (e.g., <code>config_codec</code> for a <code>config</code> type)</li><li>The <code>~enc</code> parameter always extracts the field from the record</li><li>Codecs are defined using the applicative-style <a href="tomlt/Tomlt/Table/index.html"><code>Tomlt.Table</code></a> builder</li></ul><h2 id="config_files"><a href="#config_files" class="anchor"></a>Parsing Configuration Files</h2><p>The most common use case: parsing a TOML configuration file into an OCaml record.</p><h3 id="basic-configuration"><a href="#basic-configuration" class="anchor"></a>Basic Configuration</h3><div><pre class="language-ocaml"><code>type database_config = {
+  host : string;
+  port : int;
+  name : string;
+}
+
+let database_config_codec =
+  Tomlt.(Table.(
+    obj (fun host port name -&gt; { host; port; name })
+    |&gt; mem &quot;host&quot; string ~enc:(fun c -&gt; c.host)
+    |&gt; mem &quot;port&quot; int ~enc:(fun c -&gt; c.port)
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; finish
+  ))</code></pre></div><p>This handles TOML like:</p><pre>host = &quot;localhost&quot;
+port = 5432
+name = &quot;myapp&quot;</pre><h3 id="nested-configuration"><a href="#nested-configuration" class="anchor"></a>Nested Configuration</h3><p>For nested tables, compose codecs:</p><div><pre class="language-ocaml"><code>type server_config = {
+  host : string;
+  port : int;
+}
+
+type app_config = {
+  name : string;
+  server : server_config;
+  debug : bool;
+}
+
+let server_config_codec =
+  Tomlt.(Table.(
+    obj (fun host port -&gt; { host; port })
+    |&gt; mem &quot;host&quot; string ~enc:(fun s -&gt; s.host)
+    |&gt; mem &quot;port&quot; int ~enc:(fun s -&gt; s.port)
+    |&gt; finish
+  ))
+
+let app_config_codec =
+  Tomlt.(Table.(
+    obj (fun name server debug -&gt; { name; server; debug })
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; mem &quot;server&quot; server_config_codec ~enc:(fun c -&gt; c.server)
+    |&gt; mem &quot;debug&quot; bool ~enc:(fun c -&gt; c.debug)
+    |&gt; finish
+  ))</code></pre></div><p>This handles:</p><pre>name = &quot;My Application&quot;
+debug = false
+
+[server]
+host = &quot;0.0.0.0&quot;
+port = 8080</pre><h3 id="multi-environment-configuration"><a href="#multi-environment-configuration" class="anchor"></a>Multi-Environment Configuration</h3><p>A pattern for dev/staging/prod configurations:</p><div><pre class="language-ocaml"><code>type env_config = {
+  database_url : string;
+  log_level : string;
+  cache_ttl : int;
+}
+
+type config = {
+  app_name : string;
+  development : env_config;
+  production : env_config;
+}
+
+let env_config_codec =
+  Tomlt.(Table.(
+    obj (fun database_url log_level cache_ttl -&gt;
+      { database_url; log_level; cache_ttl })
+    |&gt; mem &quot;database_url&quot; string ~enc:(fun e -&gt; e.database_url)
+    |&gt; mem &quot;log_level&quot; string ~enc:(fun e -&gt; e.log_level)
+    |&gt; mem &quot;cache_ttl&quot; int ~enc:(fun e -&gt; e.cache_ttl)
+    |&gt; finish
+  ))
+
+let config_codec =
+  Tomlt.(Table.(
+    obj (fun app_name development production -&gt;
+      { app_name; development; production })
+    |&gt; mem &quot;app_name&quot; string ~enc:(fun c -&gt; c.app_name)
+    |&gt; mem &quot;development&quot; env_config_codec ~enc:(fun c -&gt; c.development)
+    |&gt; mem &quot;production&quot; env_config_codec ~enc:(fun c -&gt; c.production)
+    |&gt; finish
+  ))</code></pre></div><h2 id="optional_values"><a href="#optional_values" class="anchor"></a>Optional and Absent Values</h2><p>TOML tables may have optional members. Tomlt provides several ways to handle missing values.</p><h3 id="default-values-with-dec_absent"><a href="#default-values-with-dec_absent" class="anchor"></a>Default Values with dec_absent</h3><p>Use <code>~dec_absent</code> to provide a default when a key is missing:</p><div><pre class="language-ocaml"><code>type settings = {
+  theme : string;
+  font_size : int;
+  show_line_numbers : bool;
+}
+
+let settings_codec =
+  Tomlt.(Table.(
+    obj (fun theme font_size show_line_numbers -&gt;
+      { theme; font_size; show_line_numbers })
+    |&gt; mem &quot;theme&quot; string ~enc:(fun s -&gt; s.theme)
+        ~dec_absent:&quot;default&quot;
+    |&gt; mem &quot;font_size&quot; int ~enc:(fun s -&gt; s.font_size)
+        ~dec_absent:12
+    |&gt; mem &quot;show_line_numbers&quot; bool ~enc:(fun s -&gt; s.show_line_numbers)
+        ~dec_absent:true
+    |&gt; finish
+  ))</code></pre></div><pre># All of these work:
+theme = &quot;dark&quot;
+
+# Or with defaults:
+# (empty table uses all defaults)</pre><h3 id="option-types-with-opt_mem"><a href="#option-types-with-opt_mem" class="anchor"></a>Option Types with opt_mem</h3><p>Use <a href="tomlt/Tomlt/Table/index.html#val-opt_mem"><code>Tomlt.Table.opt_mem</code></a> when the absence of a value is meaningful:</p><div><pre class="language-ocaml"><code>type user = {
+  name : string;
+  email : string option;
+  phone : string option;
+}
+
+let user_codec =
+  Tomlt.(Table.(
+    obj (fun name email phone -&gt; { name; email; phone })
+    |&gt; mem &quot;name&quot; string ~enc:(fun u -&gt; u.name)
+    |&gt; opt_mem &quot;email&quot; string ~enc:(fun u -&gt; u.email)
+    |&gt; opt_mem &quot;phone&quot; string ~enc:(fun u -&gt; u.phone)
+    |&gt; finish
+  ))</code></pre></div><p>On encoding, <code>None</code> values are omitted from the output:</p><div><pre class="language-ocaml"><code>(* This user: *)
+let user = { name = &quot;Alice&quot;; email = Some &quot;alice@example.com&quot;; phone = None }
+
+(* Encodes to: *)
+(* name = &quot;Alice&quot;
+   email = &quot;alice@example.com&quot;
+   # phone is omitted *)</code></pre></div><h3 id="conditional-omission-with-enc_omit"><a href="#conditional-omission-with-enc_omit" class="anchor"></a>Conditional Omission with enc_omit</h3><p>Use <code>~enc_omit</code> to omit values that match a predicate:</p><div><pre class="language-ocaml"><code>type config = {
+  name : string;
+  retries : int;  (* omit if 0 *)
+}
+
+let config_codec =
+  Tomlt.(Table.(
+    obj (fun name retries -&gt; { name; retries })
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; mem &quot;retries&quot; int ~enc:(fun c -&gt; c.retries)
+        ~dec_absent:0
+        ~enc_omit:(fun r -&gt; r = 0)
+    |&gt; finish
+  ))</code></pre></div><h2 id="datetimes"><a href="#datetimes" class="anchor"></a>Working with Datetimes</h2><p>TOML 1.1 supports four datetime formats. Tomlt provides Ptime-based codecs that handle all of them.</p><h3 id="toml-datetime-formats"><a href="#toml-datetime-formats" class="anchor"></a>TOML Datetime Formats</h3><pre># Offset datetime - full timestamp with timezone (unambiguous)
+published = 2024-01-15T10:30:00Z
+published = 2024-01-15T10:30:00-05:00
+
+# Local datetime - no timezone (wall clock time)
+meeting = 2024-01-15T10:30:00
+
+# Local date - date only
+birthday = 1979-05-27
+
+# Local time - time only
+alarm = 07:30:00</pre><h3 id="basic-datetime-handling"><a href="#basic-datetime-handling" class="anchor"></a>Basic Datetime Handling</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime"><code>Tomlt.ptime</code></a> to accept any datetime format and normalize to <code>Ptime.t</code>:</p><div><pre class="language-ocaml"><code>type event = { name : string; timestamp : Ptime.t }
+
+let event_codec =
+  Tomlt.(Table.(
+    obj (fun name timestamp -&gt; { name; timestamp })
+    |&gt; mem &quot;name&quot; string ~enc:(fun e -&gt; e.name)
+    |&gt; mem &quot;when&quot; (ptime ()) ~enc:(fun e -&gt; e.timestamp)
+    |&gt; finish
+  ))
+
+(* All of these decode successfully: *)
+(* when = 2024-01-15T10:30:00Z       -&gt; offset datetime *)
+(* when = 2024-01-15T10:30:00        -&gt; local datetime *)
+(* when = 2024-01-15                 -&gt; date only (midnight) *)
+(* when = 10:30:00                   -&gt; time only (today) *)</code></pre></div><h3 id="strict-timestamp-validation"><a href="#strict-timestamp-validation" class="anchor"></a>Strict Timestamp Validation</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime_opt"><code>Tomlt.ptime_opt</code></a> when you require explicit timezone information:</p><div><pre class="language-ocaml"><code>type audit_log = { action : string; timestamp : Ptime.t }
+
+let audit_codec =
+  Tomlt.(Table.(
+    obj (fun action timestamp -&gt; { action; timestamp })
+    |&gt; mem &quot;action&quot; string ~enc:(fun a -&gt; a.action)
+    |&gt; mem &quot;timestamp&quot; (ptime_opt ()) ~enc:(fun a -&gt; a.timestamp)
+    |&gt; finish
+  ))
+
+(* Valid:   timestamp = 2024-01-15T10:30:00Z *)
+(* Valid:   timestamp = 2024-01-15T10:30:00+05:30 *)
+(* Invalid: timestamp = 2024-01-15T10:30:00 (no timezone) *)
+(* Invalid: timestamp = 2024-01-15 (date only) *)</code></pre></div><h3 id="date-only-fields"><a href="#date-only-fields" class="anchor"></a>Date-Only Fields</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime_date"><code>Tomlt.ptime_date</code></a> for fields that should only contain dates:</p><div><pre class="language-ocaml"><code>type person = { name : string; birthday : Ptime.date }
+
+let person_codec =
+  Tomlt.(Table.(
+    obj (fun name birthday -&gt; { name; birthday })
+    |&gt; mem &quot;name&quot; string ~enc:(fun p -&gt; p.name)
+    |&gt; mem &quot;birthday&quot; ptime_date ~enc:(fun p -&gt; p.birthday)
+    |&gt; finish
+  ))
+
+(* birthday = 1979-05-27 -&gt; (1979, 5, 27) *)</code></pre></div><h3 id="time-only-fields"><a href="#time-only-fields" class="anchor"></a>Time-Only Fields</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime_span"><code>Tomlt.ptime_span</code></a> for recurring times (as duration from midnight):</p><div><pre class="language-ocaml"><code>type alarm = { label : string; time : Ptime.Span.t }
+
+let alarm_codec =
+  Tomlt.(Table.(
+    obj (fun label time -&gt; { label; time })
+    |&gt; mem &quot;label&quot; string ~enc:(fun a -&gt; a.label)
+    |&gt; mem &quot;time&quot; ptime_span ~enc:(fun a -&gt; a.time)
+    |&gt; finish
+  ))
+
+(* time = 07:30:00 -&gt; 27000 seconds (7.5 hours from midnight) *)</code></pre></div><h3 id="preserving-datetime-format"><a href="#preserving-datetime-format" class="anchor"></a>Preserving Datetime Format</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime_full"><code>Tomlt.ptime_full</code></a> to preserve the exact datetime variant for roundtripping:</p><div><pre class="language-ocaml"><code>type flexible_event = {
+  name : string;
+  when_ : Toml.ptime_datetime;
+}
+
+let flexible_codec =
+  Tomlt.(Table.(
+    obj (fun name when_ -&gt; { name; when_ })
+    |&gt; mem &quot;name&quot; string ~enc:(fun e -&gt; e.name)
+    |&gt; mem &quot;when&quot; (ptime_full ()) ~enc:(fun e -&gt; e.when_)
+    |&gt; finish
+  ))
+
+(* Decoding preserves the variant:
+   when = 2024-01-15T10:30:00Z -&gt; `Datetime (ptime, Some 0)
+   when = 2024-01-15T10:30:00  -&gt; `Datetime_local ptime
+   when = 2024-01-15           -&gt; `Date (2024, 1, 15)
+   when = 10:30:00             -&gt; `Time (10, 30, 0, 0)
+
+   Encoding reproduces the original format. *)</code></pre></div><h3 id="timezone-handling"><a href="#timezone-handling" class="anchor"></a>Timezone Handling</h3><p>For local datetimes without explicit timezone, you can specify how to interpret them:</p><div><pre class="language-ocaml"><code>(* Force UTC interpretation *)
+let utc_codec = Tomlt.ptime ~tz_offset_s:0 ()
+
+(* Force Eastern Time (-05:00 = -18000 seconds) *)
+let eastern_codec = Tomlt.ptime ~tz_offset_s:(-18000) ()
+
+(* Use system timezone (requires Tomlt_unix) *)
+let system_codec =
+  Tomlt.ptime ~get_tz:Tomlt_unix.current_tz_offset_s ()</code></pre></div><h2 id="arrays"><a href="#arrays" class="anchor"></a>Working with Arrays</h2><p>TOML 1.1 supports heterogeneous arrays, but most use cases involve homogeneous arrays of a single type.</p><h3 id="basic-arrays"><a href="#basic-arrays" class="anchor"></a>Basic Arrays</h3><div><pre class="language-ocaml"><code>type config = {
+  name : string;
+  ports : int list;
+  hosts : string list;
+}
+
+let config_codec =
+  Tomlt.(Table.(
+    obj (fun name ports hosts -&gt; { name; ports; hosts })
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; mem &quot;ports&quot; (list int) ~enc:(fun c -&gt; c.ports)
+    |&gt; mem &quot;hosts&quot; (list string) ~enc:(fun c -&gt; c.hosts)
+    |&gt; finish
+  ))</code></pre></div><pre>name = &quot;load-balancer&quot;
+ports = [80, 443, 8080]
+hosts = [&quot;web1.example.com&quot;, &quot;web2.example.com&quot;]</pre><h3 id="arrays-of-tables"><a href="#arrays-of-tables" class="anchor"></a>Arrays of Tables</h3><p>Use <a href="tomlt/Tomlt/index.html#val-array_of_tables"><code>Tomlt.array_of_tables</code></a> for TOML's <code>[[name]]</code> syntax:</p><div><pre class="language-ocaml"><code>type product = { name : string; price : float }
+type catalog = { products : product list }
+
+let product_codec =
+  Tomlt.(Table.(
+    obj (fun name price -&gt; { name; price })
+    |&gt; mem &quot;name&quot; string ~enc:(fun p -&gt; p.name)
+    |&gt; mem &quot;price&quot; float ~enc:(fun p -&gt; p.price)
+    |&gt; finish
+  ))
+
+let catalog_codec =
+  Tomlt.(Table.(
+    obj (fun products -&gt; { products })
+    |&gt; mem &quot;products&quot; (array_of_tables product_codec)
+        ~enc:(fun c -&gt; c.products)
+    |&gt; finish
+  ))</code></pre></div><pre>[[products]]
+name = &quot;Widget&quot;
+price = 9.99
+
+[[products]]
+name = &quot;Gadget&quot;
+price = 19.99</pre><h3 id="nested-arrays"><a href="#nested-arrays" class="anchor"></a>Nested Arrays</h3><p>Arrays can contain other arrays:</p><div><pre class="language-ocaml"><code>type matrix = { rows : int list list }
+
+let matrix_codec =
+  Tomlt.(Table.(
+    obj (fun rows -&gt; { rows })
+    |&gt; mem &quot;rows&quot; (list (list int)) ~enc:(fun m -&gt; m.rows)
+    |&gt; finish
+  ))</code></pre></div><pre>rows = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]</pre><h3 id="custom-array-types"><a href="#custom-array-types" class="anchor"></a>Custom Array Types</h3><p>Use <a href="tomlt/Tomlt/Array/index.html#val-map"><code>Tomlt.Array.map</code></a> to decode into custom collection types:</p><div><pre class="language-ocaml"><code>module IntSet = Set.Make(Int)
+
+let int_set_codec =
+  Tomlt.Array.(
+    map int
+      ~dec_empty:(fun () -&gt; IntSet.empty)
+      ~dec_add:(fun x acc -&gt; IntSet.add x acc)
+      ~dec_finish:(fun acc -&gt; acc)
+      ~enc:{ fold = (fun f acc set -&gt; IntSet.fold (fun x a -&gt; f a x) set acc) }
+    |&gt; finish
+  )</code></pre></div><h2 id="tables"><a href="#tables" class="anchor"></a>Nested Tables and Objects</h2><h3 id="inline-tables"><a href="#inline-tables" class="anchor"></a>Inline Tables</h3><p>Use <a href="tomlt/Tomlt/Table/index.html#val-inline"><code>Tomlt.Table.inline</code></a> to encode as inline tables:</p><div><pre class="language-ocaml"><code>type point = { x : int; y : int }
+
+let point_codec =
+  Tomlt.(Table.(
+    obj (fun x y -&gt; { x; y })
+    |&gt; mem &quot;x&quot; int ~enc:(fun p -&gt; p.x)
+    |&gt; mem &quot;y&quot; int ~enc:(fun p -&gt; p.y)
+    |&gt; inline  (* &lt;- produces inline table *)
+  ))
+
+(* Encodes as: point = { x = 10, y = 20 } *)
+(* Instead of:
+   [point]
+   x = 10
+   y = 20 *)</code></pre></div><h3 id="deeply-nested-structures"><a href="#deeply-nested-structures" class="anchor"></a>Deeply Nested Structures</h3><div><pre class="language-ocaml"><code>type address = { street : string; city : string }
+type company = { name : string; address : address }
+type employee = { name : string; company : company }
+
+let address_codec =
+  Tomlt.(Table.(
+    obj (fun street city -&gt; { street; city })
+    |&gt; mem &quot;street&quot; string ~enc:(fun a -&gt; a.street)
+    |&gt; mem &quot;city&quot; string ~enc:(fun a -&gt; a.city)
+    |&gt; finish
+  ))
+
+let company_codec =
+  Tomlt.(Table.(
+    obj (fun name address -&gt; { name; address })
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; mem &quot;address&quot; address_codec ~enc:(fun c -&gt; c.address)
+    |&gt; finish
+  ))
+
+let employee_codec =
+  Tomlt.(Table.(
+    obj (fun name company -&gt; { name; company })
+    |&gt; mem &quot;name&quot; string ~enc:(fun e -&gt; e.name)
+    |&gt; mem &quot;company&quot; company_codec ~enc:(fun e -&gt; e.company)
+    |&gt; finish
+  ))</code></pre></div><pre>name = &quot;Alice&quot;
+
+[company]
+name = &quot;Acme Corp&quot;
+
+[company.address]
+street = &quot;123 Main St&quot;
+city = &quot;Springfield&quot;</pre><h2 id="unknown_members"><a href="#unknown_members" class="anchor"></a>Unknown Member Handling</h2><p>By default, unknown members in TOML tables are ignored. You can change this behavior.</p><h3 id="ignoring-unknown-members-(default)"><a href="#ignoring-unknown-members-(default)" class="anchor"></a>Ignoring Unknown Members (Default)</h3><div><pre class="language-ocaml"><code>let config_codec =
+  Tomlt.(Table.(
+    obj (fun host -&gt; host)
+    |&gt; mem &quot;host&quot; string ~enc:Fun.id
+    |&gt; skip_unknown  (* default, can be omitted *)
+    |&gt; finish
+  ))
+
+(* This works even with extra keys: *)
+(* host = &quot;localhost&quot;
+   unknown_key = &quot;ignored&quot; *)</code></pre></div><h3 id="rejecting-unknown-members"><a href="#rejecting-unknown-members" class="anchor"></a>Rejecting Unknown Members</h3><p>Use <a href="tomlt/Tomlt/Table/index.html#val-error_unknown"><code>Tomlt.Table.error_unknown</code></a> for strict parsing:</p><div><pre class="language-ocaml"><code>let strict_config_codec =
+  Tomlt.(Table.(
+    obj (fun host port -&gt; (host, port))
+    |&gt; mem &quot;host&quot; string ~enc:fst
+    |&gt; mem &quot;port&quot; int ~enc:snd
+    |&gt; error_unknown  (* &lt;- rejects unknown keys *)
+    |&gt; finish
+  ))
+
+(* Error on: host = &quot;localhost&quot;
+             port = 8080
+             typo = &quot;oops&quot;  &lt;- causes error *)</code></pre></div><h3 id="collecting-unknown-members"><a href="#collecting-unknown-members" class="anchor"></a>Collecting Unknown Members</h3><p>Use <a href="tomlt/Tomlt/Table/index.html#val-keep_unknown"><code>Tomlt.Table.keep_unknown</code></a> to preserve unknown members:</p><div><pre class="language-ocaml"><code>type config = {
+  name : string;
+  extra : (string * Toml.t) list;
+}
+
+let config_codec =
+  Tomlt.(Table.(
+    obj (fun name extra -&gt; { name; extra })
+    |&gt; mem &quot;name&quot; string ~enc:(fun c -&gt; c.name)
+    |&gt; keep_unknown (Mems.assoc value) ~enc:(fun c -&gt; c.extra)
+    |&gt; finish
+  ))
+
+(* Decoding:
+   name = &quot;app&quot;
+   foo = 42
+   bar = &quot;hello&quot;
+
+   Results in:
+   { name = &quot;app&quot;; extra = [(&quot;foo&quot;, Int 42L); (&quot;bar&quot;, String &quot;hello&quot;)] }
+*)</code></pre></div><h3 id="typed-unknown-members"><a href="#typed-unknown-members" class="anchor"></a>Typed Unknown Members</h3><p>Collect unknown members with a specific type:</p><div><pre class="language-ocaml"><code>module StringMap = Map.Make(String)
+
+type translations = {
+  default_lang : string;
+  strings : string StringMap.t;
+}
+
+let translations_codec =
+  Tomlt.(Table.(
+    obj (fun default_lang strings -&gt; { default_lang; strings })
+    |&gt; mem &quot;default_lang&quot; string ~enc:(fun t -&gt; t.default_lang)
+    |&gt; keep_unknown (Mems.string_map string) ~enc:(fun t -&gt; t.strings)
+    |&gt; finish
+  ))
+
+(* Decoding:
+   default_lang = &quot;en&quot;
+   hello = &quot;Hello&quot;
+   goodbye = &quot;Goodbye&quot;
+   thanks = &quot;Thank you&quot;
+
+   All string keys except default_lang go into the strings map.
+*)</code></pre></div><h2 id="validation"><a href="#validation" class="anchor"></a>Validation and Constraints</h2><h3 id="range-validation-with-iter"><a href="#range-validation-with-iter" class="anchor"></a>Range Validation with iter</h3><p>Use <a href="tomlt/Tomlt/index.html#val-iter"><code>Tomlt.iter</code></a> to add validation:</p><div><pre class="language-ocaml"><code>let port_codec =
+  Tomlt.(iter int
+    ~dec:(fun p -&gt;
+      if p &lt; 0 || p &gt; 65535 then
+        failwith &quot;port must be between 0 and 65535&quot;))
+
+let percentage_codec =
+  Tomlt.(iter float
+    ~dec:(fun p -&gt;
+      if p &lt; 0.0 || p &gt; 100.0 then
+        failwith &quot;percentage must be between 0 and 100&quot;))</code></pre></div><h3 id="string-enumerations"><a href="#string-enumerations" class="anchor"></a>String Enumerations</h3><p>Use <a href="tomlt/Tomlt/index.html#val-enum"><code>Tomlt.enum</code></a> for fixed string values:</p><div><pre class="language-ocaml"><code>type log_level = Debug | Info | Warning | Error
+
+let log_level_codec =
+  Tomlt.enum [
+    &quot;debug&quot;, Debug;
+    &quot;info&quot;, Info;
+    &quot;warning&quot;, Warning;
+    &quot;error&quot;, Error;
+  ]
+
+type config = { level : log_level }
+
+let config_codec =
+  Tomlt.(Table.(
+    obj (fun level -&gt; { level })
+    |&gt; mem &quot;level&quot; log_level_codec ~enc:(fun c -&gt; c.level)
+    |&gt; finish
+  ))</code></pre></div><h3 id="custom-transformations-with-map"><a href="#custom-transformations-with-map" class="anchor"></a>Custom Transformations with map</h3><p>Use <a href="tomlt/Tomlt/index.html#val-map"><code>Tomlt.map</code></a> to transform between representations:</p><div><pre class="language-ocaml"><code>(* Store URI as string in TOML *)
+let uri_codec =
+  Tomlt.(map string
+    ~dec:Uri.of_string
+    ~enc:Uri.to_string)
+
+(* Parse comma-separated tags *)
+let tags_codec =
+  Tomlt.(map string
+    ~dec:(String.split_on_char ',')
+    ~enc:(String.concat &quot;,&quot;))</code></pre></div><h2 id="roundtripping"><a href="#roundtripping" class="anchor"></a>Roundtripping TOML</h2><h3 id="preserving-raw-values"><a href="#preserving-raw-values" class="anchor"></a>Preserving Raw Values</h3><p>Use <a href="tomlt/Tomlt/index.html#val-value"><code>Tomlt.value</code></a> to preserve parts of a document unchanged:</p><div><pre class="language-ocaml"><code>type partial_config = {
+  version : int;
+  rest : Toml.t;  (* preserve everything else *)
+}
+
+(* This requires a different approach - extract version,
+   keep the rest as raw TOML *)</code></pre></div><h3 id="preserving-datetime-variants"><a href="#preserving-datetime-variants" class="anchor"></a>Preserving Datetime Variants</h3><p>Use <a href="tomlt/Tomlt/index.html#val-ptime_full"><code>Tomlt.ptime_full</code></a> to roundtrip datetime formats:</p><div><pre class="language-ocaml"><code>type event = {
+  name : string;
+  when_ : Toml.ptime_datetime;
+}
+
+let event_codec =
+  Tomlt.(Table.(
+    obj (fun name when_ -&gt; { name; when_ })
+    |&gt; mem &quot;name&quot; string ~enc:(fun e -&gt; e.name)
+    |&gt; mem &quot;when&quot; (ptime_full ()) ~enc:(fun e -&gt; e.when_)
+    |&gt; finish
+  ))
+
+(* Input:  when = 2024-01-15
+   Output: when = 2024-01-15  (not 2024-01-15T00:00:00Z) *)</code></pre></div><h2 id="error_handling"><a href="#error_handling" class="anchor"></a>Error Handling</h2><h3 id="result-based-decoding"><a href="#result-based-decoding" class="anchor"></a>Result-Based Decoding</h3><p>Always use <a href="tomlt/Tomlt/index.html#val-decode"><code>Tomlt.decode</code></a> in production code:</p><div><pre class="language-ocaml"><code>let load_config path =
+  match Tomlt_unix.decode_file config_codec path with
+  | Ok config -&gt; config
+  | Error e -&gt;
+    Printf.eprintf &quot;Configuration error: %s\n&quot;
+      (Toml.Error.to_string e);
+    exit 1</code></pre></div><h3 id="decoding-with-context"><a href="#decoding-with-context" class="anchor"></a>Decoding with Context</h3><p>Errors include path information for nested structures:</p><div><pre class="language-ocaml"><code>(* For deeply nested errors like:
+   [database]
+   port = &quot;not an int&quot;
+
+   The error will indicate:
+   &quot;at database.port: expected int, got string&quot; *)</code></pre></div><h3 id="multiple-validation-errors"><a href="#multiple-validation-errors" class="anchor"></a>Multiple Validation Errors</h3><p>For collecting multiple errors, decode fields individually:</p><div><pre class="language-ocaml"><code>let validate_config toml =
+  let errors = ref [] in
+  let get_field name codec =
+    match Tomlt.(decode (mem name codec) toml) with
+    | Ok v -&gt; Some v
+    | Error e -&gt;
+      errors := (name, e) :: !errors;
+      None
+  in
+  let host = get_field &quot;host&quot; Tomlt.string in
+  let port = get_field &quot;port&quot; Tomlt.int in
+  match !errors with
+  | [] -&gt; Ok { host = Option.get host; port = Option.get port }
+  | errs -&gt; Error errs</code></pre></div><h2 id="recursion"><a href="#recursion" class="anchor"></a>Recursive Types</h2><p>Use <a href="tomlt/Tomlt/index.html#val-rec'"><code>Tomlt.rec'</code></a> for self-referential types:</p><div><pre class="language-ocaml"><code>type tree = Node of int * tree list
+
+let rec tree_codec = lazy Tomlt.(
+  Table.(
+    obj (fun value children -&gt; Node (value, children))
+    |&gt; mem &quot;value&quot; int ~enc:(function Node (v, _) -&gt; v)
+    |&gt; mem &quot;children&quot; (list (rec' tree_codec))
+        ~enc:(function Node (_, cs) -&gt; cs)
+        ~dec_absent:[]
+    |&gt; finish
+  ))
+
+let tree_codec = Lazy.force tree_codec</code></pre></div><pre>value = 1
+
+[[children]]
+value = 2
+
+[[children]]
+value = 3
+
+[[children.children]]
+value = 4</pre></div></body></html>
