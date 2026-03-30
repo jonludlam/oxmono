@@ -44,7 +44,7 @@ jobs:
           opam install dune --yes
 
       - name: Build docs
-        run: opam exec -- dune build -j2 @doc-full
+        run: opam exec -- dune build -j1 @doc-full --verbose
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
